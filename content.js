@@ -95,7 +95,7 @@ async function getUserIdByUsername(username) {
       const data = await response.json();
 
       if (!response.ok) {
-        log('API ERROR for', username, '- Status:', response.status, 'Response:', data);
+        log('API ERROR for', username, '- Status:', response.status);
         return null;
       }
 
@@ -106,7 +106,7 @@ async function getUserIdByUsername(username) {
         log('✓ Looked up user ID:', username, '->', userId);
         return userId;
       } else {
-        log('Could not find user ID for:', username, '- Response data:', data);
+        log('Could not find user ID for:', username);
         return null;
       }
     } catch (error) {
@@ -174,10 +174,7 @@ async function fetchLists() {
   });
 
   try {
-    const url = `${GRAPHQL_ENDPOINT}/${LISTS_QUERY_ID}/ListsManagementPageTimeline?${params}`;
-    log('Fetching lists from:', url);
-
-    const response = await fetch(url, {
+    const response = await fetch(`${GRAPHQL_ENDPOINT}/${LISTS_QUERY_ID}/ListsManagementPageTimeline?${params}`, {
       headers: {
         'authorization': BEARER_TOKEN,
         'x-csrf-token': csrfToken,
@@ -187,11 +184,8 @@ async function fetchLists() {
 
     const data = await response.json();
 
-    log('Lists API response status:', response.status);
-    log('Full response data:', JSON.stringify(data, null, 2));
-
     if (!response.ok) {
-      log('Lists API ERROR - Status:', response.status, 'Response:', data);
+      log('Lists API ERROR - Status:', response.status);
       return [];
     }
 
@@ -392,27 +386,44 @@ function showListDropdown(lists, userId, button, username = '') {
 // Add buttons to timeline tweets
 function addButtonsToTimelineTweets() {
   const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+  log('Scanning timeline - found', tweets.length, 'tweets');
+
+  let added = 0;
+  let skipped = 0;
 
   tweets.forEach(tweet => {
     const tweetId = tweet.getAttribute('data-tweet-id') || Math.random().toString();
     tweet.setAttribute('data-tweet-id', tweetId);
 
-    if (processedTweets.has(tweetId)) return;
+    if (processedTweets.has(tweetId)) {
+      skipped++;
+      return;
+    }
 
     const userArea = tweet.querySelector('[data-testid="User-Name"]');
-    if (!userArea) return;
+    if (!userArea) {
+      log('No User-Name area found in tweet');
+      return;
+    }
 
     if (userArea.querySelector('.timeline-list-btn')) {
       processedTweets.add(tweetId);
+      skipped++;
       return;
     }
 
     // Get username from link
     const userLink = tweet.querySelector('a[href^="/"][role="link"]');
-    if (!userLink) return;
+    if (!userLink) {
+      log('No user link found in tweet');
+      return;
+    }
 
     let username = userLink.getAttribute('href')?.replace('/', '').split('/')[0];
-    if (!username) return;
+    if (!username) {
+      log('Could not extract username from link');
+      return;
+    }
 
     username = username.replace('@', '').toLowerCase();
 
@@ -427,7 +438,12 @@ function addButtonsToTimelineTweets() {
 
     userArea.appendChild(buttonContainer);
     processedTweets.add(tweetId);
+    added++;
   });
+
+  if (added > 0 || tweets.length > 0) {
+    log('Timeline scan complete:', added, 'buttons added,', skipped, 'already processed');
+  }
 }
 
 // Profile page support
