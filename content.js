@@ -332,36 +332,93 @@ function showListDropdown(lists, userId, button, username = '') {
     dropdown.appendChild(header);
   }
 
+  const selectedLists = new Set();
+
   lists.forEach(list => {
     const item = document.createElement('div');
     item.className = 'quick-list-item';
-    item.textContent = list.name;
 
-    item.addEventListener('click', async (e) => {
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'quick-list-checkbox';
+    checkbox.id = `list-checkbox-${list.id}`;
+
+    const label = document.createElement('label');
+    label.className = 'quick-list-label';
+    label.htmlFor = `list-checkbox-${list.id}`;
+    label.textContent = list.name;
+
+    checkbox.addEventListener('change', (e) => {
       e.stopPropagation();
-      item.textContent = 'Adding...';
-      const success = await addUserToList(list.id, userId);
-
-      if (success) {
-        item.textContent = '✓ Added';
-        setTimeout(() => {
-          dropdown.remove();
-          button.innerHTML = '✓';
-          button.disabled = false;
-          setTimeout(() => {
-            button.innerHTML = '📋';
-          }, 2000);
-        }, 800);
+      if (checkbox.checked) {
+        selectedLists.add(list.id);
       } else {
-        item.textContent = 'Failed';
-        setTimeout(() => {
-          item.textContent = list.name;
-        }, 2000);
+        selectedLists.delete(list.id);
       }
+    });
+
+    item.appendChild(checkbox);
+    item.appendChild(label);
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      checkbox.checked = !checkbox.checked;
+      checkbox.dispatchEvent(new Event('change'));
     });
 
     dropdown.appendChild(item);
   });
+
+  // Add submit button
+  const submitButton = document.createElement('button');
+  submitButton.className = 'quick-list-submit';
+  submitButton.textContent = 'Add to Lists';
+
+  submitButton.addEventListener('click', async (e) => {
+    e.stopPropagation();
+
+    if (selectedLists.size === 0) {
+      submitButton.textContent = 'Select at least one list';
+      setTimeout(() => {
+        submitButton.textContent = 'Add to Lists';
+      }, 2000);
+      return;
+    }
+
+    submitButton.textContent = 'Adding...';
+    submitButton.disabled = true;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const listId of selectedLists) {
+      const success = await addUserToList(listId, userId);
+      if (success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    if (failCount === 0) {
+      submitButton.textContent = `✓ Added to ${successCount} list${successCount > 1 ? 's' : ''}`;
+      setTimeout(() => {
+        dropdown.remove();
+        button.innerHTML = '✓';
+        button.disabled = false;
+        setTimeout(() => {
+          button.innerHTML = '📋';
+        }, 2000);
+      }, 1000);
+    } else {
+      submitButton.textContent = `${successCount} succeeded, ${failCount} failed`;
+      submitButton.disabled = false;
+      setTimeout(() => {
+        submitButton.textContent = 'Add to Lists';
+      }, 3000);
+    }
+  });
+
+  dropdown.appendChild(submitButton);
 
   const rect = button.getBoundingClientRect();
   dropdown.style.top = `${rect.bottom + window.scrollY + 5}px`;
