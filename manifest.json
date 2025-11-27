@@ -10,6 +10,10 @@
     "https://x.com/*",
     "https://twitter.com/*"
   ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Twitter List Quick Add Settings"
+  },
   "content_scripts": [
     {
       "matches": [

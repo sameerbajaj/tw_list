@@ -4,12 +4,14 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 
 ## Features
 
-- Adds a 📋 button next to every username in your timeline
-- Adds a "+ List" button to every Twitter/X profile page
-- Click to see all your lists in a dropdown
-- One-click to add the user to any list
-- Works seamlessly with Twitter's UI
-- Debug logging to help troubleshoot issues
+- 📋 **Timeline buttons** - Quick add from your feed
+- 👤 **Profile buttons** - Add from profile pages
+- ✓ **View current lists** - See which lists users are already on
+- ➕➖ **Add & Remove** - Manage list membership with checkboxes
+- ⚡ **Smart caching** - 24-hour localStorage cache for instant lookups
+- 🛡️ **Rate limiting** - Built-in protection to keep your account safe
+- ⚙️ **Safety presets** - Conservative, Balanced, or Aggressive modes
+- 🔄 **Multi-select** - Add users to multiple lists at once
 
 ## Installation
 
@@ -33,16 +35,35 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 ### From Timeline (Recommended!)
 1. Browse your Twitter/X home feed
 2. You'll see a 📋 button next to each username in tweets
-3. Click it to see your lists
-4. Click any list name to add that user to the list
-5. You'll see a checkmark when it's done!
+3. Click it - extension checks which lists they're on (cached after first check)
+4. Select/deselect lists with checkboxes
+5. Click "Save Changes" to apply
 
 ### From Profile Page
 1. Go to any Twitter/X profile (e.g., `https://x.com/elonmusk`)
 2. You'll see a blue "+ List" button near the Follow button
-3. Click it to see your lists
-4. Click any list name to add the user to that list
-5. You'll see a checkmark when it's done!
+3. Click it to see your lists with current membership status
+4. Check/uncheck boxes to add/remove from lists
+5. Click "Save Changes"
+
+### Settings (Click Extension Icon)
+**Conservative (Safest)**
+- 500ms between requests
+- 10 new users per 10 minutes
+- Auto quick-mode (skips checking current lists)
+- **Best for: Main accounts, minimal risk**
+
+**Balanced (Recommended)**
+- 300ms between requests
+- 20 new users per 5 minutes
+- Manual quick-mode option
+- **Best for: Most users, good speed/safety balance**
+
+**Aggressive (Use with caution)**
+- 200ms between requests
+- 30 new users per 5 minutes
+- Optional quick-mode
+- **Best for: Power users, test accounts**
 
 ## Notes
 

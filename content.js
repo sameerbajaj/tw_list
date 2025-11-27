@@ -5,22 +5,161 @@ const GRAPHQL_ENDPOINT = 'https://x.com/i/api/graphql';
 const ADD_MEMBER_QUERY_ID = 'EadD8ivrhZhYQr2pDmCpjA';
 const REMOVE_MEMBER_QUERY_ID = 'B5tMzrMYuFHJex_4EXFTSw';
 const LIST_MEMBERS_QUERY_ID = '8ybCIfKAYYex7FdmJ0PzwQ';
+const LIST_OWNERSHIPS_QUERY_ID = 'J25SWJdbyp3MRho1c9NhqQ';
 const LISTS_QUERY_ID = 'xzVN0C62pNPWVfUjixdzeQ';
 const USER_BY_SCREEN_NAME_QUERY_ID = '-oaLodhGbbnzJBACb1kk2Q';
 const BEARER_TOKEN = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 const DEBUG = true;
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
+// Load settings from localStorage
+function getSettings() {
+  try {
+    const settings = localStorage.getItem('tw_list_settings');
+    if (settings) {
+      return JSON.parse(settings);
+    }
+  } catch (e) {
+    // Ignore
+  }
+  // Default settings (Balanced)
+  return {
+    preset: 'balanced',
+    requestDelay: 300,
+    maxLookupsPerPeriod: 20,
+    lookupPeriod: 5 * 60 * 1000,
+    skipMembershipCheck: false // Default: always check memberships
+  };
+}
+
+// Get current settings
+let currentSettings = getSettings();
+let REQUEST_DELAY = currentSettings.requestDelay;
+let MAX_LOOKUPS_PER_PERIOD = currentSettings.maxLookupsPerPeriod;
+let LOOKUP_PERIOD = currentSettings.lookupPeriod;
+
+// Reload settings when they change
+window.addEventListener('storage', (e) => {
+  if (e.key === 'tw_list_settings') {
+    currentSettings = getSettings();
+    REQUEST_DELAY = currentSettings.requestDelay;
+    MAX_LOOKUPS_PER_PERIOD = currentSettings.maxLookupsPerPeriod;
+    LOOKUP_PERIOD = currentSettings.lookupPeriod;
+    log('Settings updated:', currentSettings.preset);
+  }
+});
+
 let cachedLists = null;
+let myUserId = null; // Store the logged-in user's ID
+
+// Try to extract user ID from Twitter's initial state
+function extractMyUserId() {
+  if (myUserId) return myUserId;
+
+  // Try to get from window.__INITIAL_STATE__ or other Twitter globals
+  try {
+    // Method 1: Check document for user ID in meta tags or scripts
+    const metaTag = document.querySelector('meta[name="twitter:data1"]');
+    if (metaTag) {
+      const content = metaTag.getAttribute('content');
+      log('🔍 DEBUG: Found meta tag:', content);
+    }
+
+    // Method 2: Look for Twitter's React props in DOM
+    const reactRoot = document.querySelector('#react-root');
+    if (reactRoot && reactRoot._reactRootContainer) {
+      log('🔍 DEBUG: Found React root');
+    }
+
+    // Method 3: Parse cookies for user ID (Twitter stores it in cookies)
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'twid') {
+        // Twitter stores user ID in twid cookie as u=<userid>
+        // Need to decode URL encoding first (u%3D55644285 -> u=55644285)
+        const decodedValue = decodeURIComponent(value);
+        log('🔍 DEBUG: twid cookie found:', value, '-> decoded:', decodedValue);
+
+        const match = decodedValue.match(/u=(\d+)/);
+        if (match && match[1]) {
+          myUserId = match[1];
+          log('✅ DEBUG: Extracted user ID from cookie:', myUserId);
+          return myUserId;
+        }
+      }
+    }
+  } catch (e) {
+    log('❌ DEBUG: Error extracting user ID:', e);
+  }
+
+  return myUserId;
+}
+
 const processedTweets = new Set();
 const userIdCache = new Map();
 const pendingLookups = new Map();
+
+// Request queue for throttling
+const requestQueue = [];
+let isProcessingQueue = false;
+
+// Rate limiting tracking
+const lookupHistory = [];
 
 // LocalStorage cache management
 const CACHE_KEYS = {
   MEMBERSHIPS: 'tw_list_memberships',
   LIST_ACTIVITY: 'tw_list_activity'
 };
+
+// Add request to queue with throttling
+async function queueRequest(requestFn) {
+  return new Promise((resolve, reject) => {
+    requestQueue.push({ requestFn, resolve, reject });
+    processQueue();
+  });
+}
+
+async function processQueue() {
+  if (isProcessingQueue || requestQueue.length === 0) return;
+
+  isProcessingQueue = true;
+
+  while (requestQueue.length > 0) {
+    const { requestFn, resolve, reject } = requestQueue.shift();
+
+    try {
+      const result = await requestFn();
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    }
+
+    // Wait before processing next request
+    if (requestQueue.length > 0) {
+      await new Promise(r => setTimeout(r, REQUEST_DELAY));
+    }
+  }
+
+  isProcessingQueue = false;
+}
+
+// Check if rate limit would be exceeded
+function checkRateLimit() {
+  const now = Date.now();
+  // Clean old entries
+  const cutoff = now - LOOKUP_PERIOD;
+  const recentLookups = lookupHistory.filter(time => time > cutoff);
+  lookupHistory.length = 0;
+  lookupHistory.push(...recentLookups);
+
+  return recentLookups.length < MAX_LOOKUPS_PER_PERIOD;
+}
+
+function trackLookup() {
+  lookupHistory.push(Date.now());
+}
 
 function getCache(key) {
   try {
@@ -230,7 +369,13 @@ async function fetchLists() {
       return [];
     }
 
-    const instructions = data?.data?.viewer?.list_management_timeline?.timeline?.instructions || [];
+    // Extract user ID from cookie if not already set
+    if (!myUserId) {
+      extractMyUserId();
+    }
+
+    const viewer = data?.data?.viewer;
+    const instructions = viewer?.list_management_timeline?.timeline?.instructions || [];
 
     // Find the TimelineAddEntries instruction
     const addEntriesInstruction = instructions.find(inst => inst.type === 'TimelineAddEntries');
@@ -277,35 +422,96 @@ async function fetchLists() {
   }
 }
 
-// Check which lists a user is on
-async function getUserListMemberships(userId) {
-  // Check cache first
-  const cached = getCache(CACHE_KEYS.MEMBERSHIPS) || {};
-  if (cached[userId]) {
-    log('Using cached memberships for user:', userId);
-    return cached[userId];
+// Check which lists a user is on (using efficient ListOwnerships endpoint)
+async function getUserListMemberships(userId, skipCheck = false) {
+  // If skip check mode, return empty (user will manually select)
+  if (skipCheck) {
+    log('Skipping membership check (quick mode)');
+    return [];
   }
 
-  log('Fetching list memberships for user:', userId);
+  // CACHE TEMPORARILY DISABLED FOR DEBUGGING
+  // Check cache first
+  // const cached = getCache(CACHE_KEYS.MEMBERSHIPS) || {};
+  // log('🔍 DEBUG: Cache contents:', cached);
+  // if (cached[userId]) {
+  //   log('✅ DEBUG: Using cached memberships for user:', userId, '| Cached lists:', cached[userId]);
+  //   return cached[userId];
+  // }
+  log('🔍 DEBUG: Cache disabled - fetching fresh data for userId:', userId);
+
+  // Check rate limit
+  if (!checkRateLimit()) {
+    log('Rate limit reached - skipping membership check');
+    return null; // Return null to indicate rate limit hit
+  }
+
+  // Need myUserId to be set
+  if (!myUserId) {
+    // Try to extract it now
+    extractMyUserId();
+  }
+
+  if (!myUserId) {
+    log('❌ DEBUG: myUserId not set yet, cannot fetch memberships');
+    return [];
+  }
+
+  log('🔍 DEBUG: Fetching list memberships for userId:', userId, 'using ListOwnerships API');
+  log('🔍 DEBUG: My user ID:', myUserId);
+  trackLookup();
 
   const csrfToken = getCsrfToken();
   if (!csrfToken) return [];
 
-  const memberLists = [];
-
-  // Fetch members for each list
-  for (const list of cachedLists || []) {
-    try {
+  try {
+    // Use the efficient ListOwnerships endpoint - just ONE API call!
+    const result = await queueRequest(async () => {
       const params = new URLSearchParams({
-        variables: JSON.stringify({ listId: list.id, count: 100 }),
+        variables: JSON.stringify({
+          userId: myUserId,
+          isListMemberTargetUserId: userId,
+          count: 100
+        }),
         features: JSON.stringify({
           rweb_video_screen_enabled: false,
           profile_label_improvements_pcf_label_in_post_enabled: true,
-          responsive_web_graphql_timeline_navigation_enabled: true
+          responsive_web_profile_redirect_enabled: false,
+          rweb_tipjar_consumption_enabled: true,
+          verified_phone_label_enabled: true,
+          creator_subscriptions_tweet_preview_api_enabled: true,
+          responsive_web_graphql_timeline_navigation_enabled: true,
+          responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+          premium_content_api_read_enabled: false,
+          communities_web_enable_tweet_community_results_fetch: true,
+          c9s_tweet_anatomy_moderator_badge_enabled: true,
+          responsive_web_grok_analyze_button_fetch_trends_enabled: false,
+          responsive_web_grok_analyze_post_followups_enabled: true,
+          responsive_web_jetfuel_frame: true,
+          responsive_web_grok_share_attachment_enabled: true,
+          articles_preview_enabled: true,
+          responsive_web_edit_tweet_api_enabled: true,
+          graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+          view_counts_everywhere_api_enabled: true,
+          longform_notetweets_consumption_enabled: true,
+          responsive_web_twitter_article_tweet_consumption_enabled: true,
+          tweet_awards_web_tipping_enabled: false,
+          responsive_web_grok_show_grok_translated_post: false,
+          responsive_web_grok_analysis_button_from_backend: true,
+          creator_subscriptions_quote_tweet_preview_enabled: false,
+          freedom_of_speech_not_reach_fetch_enabled: true,
+          standardized_nudges_misinfo: true,
+          tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+          longform_notetweets_rich_text_read_enabled: true,
+          longform_notetweets_inline_media_enabled: true,
+          responsive_web_grok_image_annotation_enabled: true,
+          responsive_web_grok_imagine_annotation_enabled: true,
+          responsive_web_grok_community_note_auto_translation_is_enabled: false,
+          responsive_web_enhance_cards_enabled: false
         })
       });
 
-      const response = await fetch(`${GRAPHQL_ENDPOINT}/${LIST_MEMBERS_QUERY_ID}/ListMembers?${params}`, {
+      const response = await fetch(`${GRAPHQL_ENDPOINT}/${LIST_OWNERSHIPS_QUERY_ID}/ListOwnerships?${params}`, {
         headers: {
           'authorization': BEARER_TOKEN,
           'x-csrf-token': csrfToken,
@@ -313,32 +519,66 @@ async function getUserListMemberships(userId) {
         }
       });
 
-      const data = await response.json();
-      const instructions = data?.data?.list?.members_timeline?.timeline?.instructions || [];
-      const entries = instructions.find(i => i.type === 'TimelineAddEntries')?.entries || [];
+      return response.json();
+    });
 
-      // Check if this user is in the members
-      for (const entry of entries) {
-        const userResult = entry.content?.itemContent?.user_results?.result;
-        if (userResult?.rest_id === userId) {
-          memberLists.push(list.id);
-          break;
+    log('🔍 DEBUG: ListOwnerships API Response:', result);
+
+    // Check for errors
+    if (result.errors) {
+      log('❌ DEBUG: API returned errors:', result.errors);
+      return [];
+    }
+
+    // Parse the response to extract list IDs
+    const memberLists = [];
+    const instructions = result?.data?.user?.result?.timeline?.timeline?.instructions || [];
+
+    log('🔍 DEBUG: Found', instructions.length, 'instructions');
+
+    for (const instruction of instructions) {
+      log('🔍 DEBUG: Processing instruction type:', instruction.type);
+
+      if (instruction.type === 'TimelineAddEntries') {
+        const entries = instruction.entries || [];
+        log('🔍 DEBUG: Found', entries.length, 'entries in TimelineAddEntries');
+
+        for (const entry of entries) {
+          log('🔍 DEBUG: Entry:', entry.entryId, '| Content type:', entry.content?.entryType);
+
+          // Extract list from entry
+          const list = entry.content?.itemContent?.list;
+          if (list?.id_str) {
+            // Check the is_member field!
+            const isMember = list.is_member;
+            log('🔍 DEBUG: List:', list.name, '(ID:', list.id_str + ') | is_member:', isMember);
+
+            if (isMember === true) {
+              memberLists.push(list.id_str);
+              log('✅ DEBUG: User IS on list:', list.name);
+            } else {
+              log('⚪ DEBUG: User is NOT on list:', list.name);
+            }
+          } else {
+            log('🔍 DEBUG: No list found in this entry');
+          }
         }
       }
-
-      // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
-    } catch (error) {
-      log('Error checking membership for list:', list.id, error);
     }
+
+    log('🔍 DEBUG: Extracted list IDs where is_member=true:', memberLists);
+
+    // CACHE TEMPORARILY DISABLED FOR DEBUGGING
+    // Cache the results
+    // cached[userId] = memberLists;
+    // setCache(CACHE_KEYS.MEMBERSHIPS, cached);
+
+    log('🔍 DEBUG: Final result - User is on', memberLists.length, 'lists:', memberLists);
+    return memberLists;
+  } catch (error) {
+    log('❌ DEBUG: Error fetching list memberships:', error);
+    return [];
   }
-
-  // Cache the results
-  cached[userId] = memberLists;
-  setCache(CACHE_KEYS.MEMBERSHIPS, cached);
-
-  log('User is on', memberLists.length, 'lists');
-  return memberLists;
 }
 
 // Add user to list
@@ -495,6 +735,8 @@ function createTimelineListButton(username) {
 
 // Show dropdown with lists
 async function showListDropdown(lists, userId, button, username = '') {
+  log('🔍 DEBUG: showListDropdown called with userId:', userId, 'username:', username);
+
   const existingDropdown = document.getElementById('quick-list-dropdown');
   if (existingDropdown) existingDropdown.remove();
 
@@ -502,11 +744,23 @@ async function showListDropdown(lists, userId, button, username = '') {
   dropdown.id = 'quick-list-dropdown';
   dropdown.className = 'quick-list-dropdown';
 
+  // Check rate limit status
+  const remainingLookups = MAX_LOOKUPS_PER_PERIOD - lookupHistory.filter(t => t > Date.now() - LOOKUP_PERIOD).length;
+  const isNearLimit = remainingLookups < 5;
+
   if (username) {
     const header = document.createElement('div');
     header.className = 'quick-list-header';
     header.textContent = `Managing @${username}...`;
     dropdown.appendChild(header);
+
+    // Add rate limit warning if near limit
+    if (isNearLimit) {
+      const warning = document.createElement('div');
+      warning.className = 'quick-list-warning';
+      warning.textContent = `⚠️ ${remainingLookups} lookups remaining (resets in ${Math.ceil((LOOKUP_PERIOD - (Date.now() - Math.min(...lookupHistory))) / 60000)} min)`;
+      dropdown.appendChild(warning);
+    }
   }
 
   // Position dropdown immediately
@@ -515,14 +769,34 @@ async function showListDropdown(lists, userId, button, username = '') {
   dropdown.style.left = `${rect.left + window.scrollX}px`;
   document.body.appendChild(dropdown);
 
+  // Determine if we should skip membership check
+  // Skip if: setting enabled OR rate limit hit
+  const shouldSkipCheck = currentSettings.skipMembershipCheck || !checkRateLimit();
+  log('🔍 DEBUG: shouldSkipCheck:', shouldSkipCheck, '(setting:', currentSettings.skipMembershipCheck, ', rate limit ok:', checkRateLimit() + ')');
+
   // Fetch current memberships
-  const currentMemberships = await getUserListMemberships(userId);
-  const initialMemberships = new Set(currentMemberships);
+  const currentMemberships = await getUserListMemberships(userId, shouldSkipCheck);
+
+  if (currentMemberships === null) {
+    // Rate limit hit
+    const header = dropdown.querySelector('.quick-list-header');
+    if (header) {
+      header.textContent = '⚠️ Rate limit reached - using quick mode';
+    }
+  }
+
+  const initialMemberships = new Set(currentMemberships || []);
 
   // Update header
   if (username) {
     const header = dropdown.querySelector('.quick-list-header');
-    header.textContent = `Add @${username} to:`;
+    if (currentMemberships && currentMemberships.length > 0) {
+      header.textContent = `@${username} is on ${currentMemberships.length} list${currentMemberships.length > 1 ? 's' : ''}`;
+    } else if (currentMemberships === null) {
+      header.textContent = `Add @${username} to:`;
+    } else {
+      header.textContent = `Add @${username} to:`;
+    }
   }
 
   // Sort lists by last activity
@@ -535,6 +809,9 @@ async function showListDropdown(lists, userId, button, username = '') {
 
   const selectedLists = new Set(currentMemberships);
 
+  log('🔍 DEBUG: selectedLists Set:', selectedLists);
+  log('🔍 DEBUG: currentMemberships array:', currentMemberships);
+
   sortedLists.forEach(list => {
     const item = document.createElement('div');
     item.className = 'quick-list-item';
@@ -543,7 +820,11 @@ async function showListDropdown(lists, userId, button, username = '') {
     checkbox.type = 'checkbox';
     checkbox.className = 'quick-list-checkbox';
     checkbox.id = `list-checkbox-${list.id}`;
-    checkbox.checked = selectedLists.has(list.id);
+
+    const isSelected = selectedLists.has(list.id);
+    log('🔍 DEBUG: List', list.name, '| list.id:', list.id, '| type:', typeof list.id, '| isSelected:', isSelected);
+
+    checkbox.checked = isSelected;
 
     const label = document.createElement('label');
     label.className = 'quick-list-label';
@@ -769,6 +1050,9 @@ async function checkAndAddProfileButton() {
 // Main initialization
 function init() {
   log('Extension initialized');
+
+  // Extract user ID early
+  extractMyUserId();
 
   checkAndAddProfileButton();
   addButtonsToTimelineTweets();
