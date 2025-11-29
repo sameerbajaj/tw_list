@@ -1,35 +1,47 @@
 /* Quick List Add Button */
-.quick-list-add-btn {
-  background: linear-gradient(to bottom, #1d9bf0, #1a8cd8);
-  color: white;
+/* Profile List Button (Icon Style) */
+.profile-list-btn {
+  background: rgba(29, 155, 240, 0.1);
   border: none;
-  border-radius: 20px;
-  padding: 8px 20px;
-  font-size: 14px;
-  font-weight: 700;
+  color: #1d9bf0;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  margin-left: 8px;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+  font-size: 14px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.quick-list-add-btn:hover {
-  background: linear-gradient(to bottom, #1a8cd8, #167ac0);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+.profile-list-btn:hover {
+  background-color: rgba(29, 155, 240, 0.2);
 }
 
-.quick-list-add-btn:active {
-  transform: translateY(0);
-  box-shadow: none;
+.profile-list-btn:active {
+  background-color: rgba(29, 155, 240, 0.3);
 }
 
-.quick-list-add-btn:disabled {
-  opacity: 0.6;
+.profile-list-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .profile-list-btn {
+    background: rgba(29, 155, 240, 0.15);
+    color: #1d9bf0;
+  }
+
+  .profile-list-btn:hover {
+    background-color: rgba(29, 155, 240, 0.25);
+  }
+
+  .profile-list-btn:active {
+    background-color: rgba(29, 155, 240, 0.35);
+  }
 }
 
 /* Dropdown */
@@ -49,8 +61,15 @@
 }
 
 @keyframes dropdownFadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Dark mode support */

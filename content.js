@@ -937,7 +937,13 @@ async function showListDropdown(lists, userId, button, username = '') {
 }
 
 // Add buttons to timeline tweets
+// Add buttons to timeline tweets
 function addButtonsToTimelineTweets() {
+  // Skip if on profile page (user only wants the header button there)
+  const isProfilePage = window.location.pathname.match(/^\/[^\/]+$/) &&
+    !window.location.pathname.match(/^\/(home|explore|notifications|messages|settings|compose)/);
+  if (isProfilePage) return;
+
   const tweets = document.querySelectorAll('article[data-testid="tweet"]');
   log('Scanning timeline - found', tweets.length, 'tweets');
 
@@ -1002,32 +1008,52 @@ function addButtonsToTimelineTweets() {
 // Profile page support
 async function checkAndAddProfileButton() {
   const isProfilePage = window.location.pathname.match(/^\/[^\/]+$/) &&
-                        !window.location.pathname.match(/^\/(home|explore|notifications|messages|settings|compose)/);
+    !window.location.pathname.match(/^\/(home|explore|notifications|messages|settings|compose)/);
 
   if (!isProfilePage) return;
 
-  const profileHeader = document.querySelector('[data-testid="userActions"]');
-  if (!profileHeader || document.getElementById('quick-list-add-btn')) return;
-
   const username = window.location.pathname.replace('/', '').toLowerCase();
+  const handleText = '@' + username;
+
+  // Find the handle element by text content
+  // We look for an element that exactly matches the handle text
+  // On the profile page header, the handle is usually a span or div, and NOT a link (unlike in tweets)
+  const allElements = document.querySelectorAll('div, span');
+  let handleElement = null;
+
+  for (const el of allElements) {
+    if (el.textContent.trim().toLowerCase() === handleText &&
+      el.children.length === 0 && // Ensure it's a leaf node (text container)
+      el.tagName !== 'A') { // Ensure it's not a link (timeline tweets have links)
+
+      // Verify it's in the upper part of the page (profile header)
+      const rect = el.getBoundingClientRect();
+      if (rect.top < 500) {
+        handleElement = el;
+        break;
+      }
+    }
+  }
+
+  if (!handleElement || document.getElementById('quick-list-add-btn')) return;
 
   const button = document.createElement('button');
   button.id = 'quick-list-add-btn';
-  button.className = 'quick-list-add-btn';
-  button.textContent = '+ List';
+  button.className = 'profile-list-btn';
+  button.innerHTML = '📋';
   button.title = 'Quick add to list';
 
   button.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    button.textContent = 'Loading...';
+    const originalContent = button.innerHTML;
     button.disabled = true;
 
     const userId = await getUserIdByUsername(username);
     if (!userId) {
       alert('Could not find user ID.');
-      button.textContent = '+ List';
+      button.innerHTML = originalContent;
       button.disabled = false;
       return;
     }
@@ -1035,7 +1061,7 @@ async function checkAndAddProfileButton() {
     const lists = await fetchLists();
     if (lists.length === 0) {
       alert('No lists found. Create a list first on Twitter.');
-      button.textContent = '+ List';
+      button.innerHTML = originalContent;
       button.disabled = false;
       return;
     }
@@ -1043,7 +1069,32 @@ async function checkAndAddProfileButton() {
     showListDropdown(lists, userId, button);
   });
 
-  profileHeader.appendChild(button);
+  // Create a wrapper to ensure proper positioning
+  const wrapper = document.createElement('span');
+  wrapper.className = 'profile-list-btn-wrapper';
+  wrapper.style.display = 'inline-flex';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.marginLeft = '8px'; // Add spacing from handle
+  wrapper.style.verticalAlign = 'middle';
+  wrapper.appendChild(button);
+
+  // Insert after the handle element
+  // We want to be on the same line.
+  // If the handleElement is a span/div inside a flex container, we can append to the parent.
+  // Or we can insert after the handleElement.
+
+  if (handleElement.parentElement) {
+    // Check if parent is a flex container
+    const parentStyle = window.getComputedStyle(handleElement.parentElement);
+    if (parentStyle.display === 'flex' || parentStyle.display === 'inline-flex') {
+      // If parent is flex, just appending to parent works
+      handleElement.parentElement.appendChild(wrapper);
+    } else {
+      // Otherwise, try to insert after
+      handleElement.insertAdjacentElement('afterend', wrapper);
+    }
+  }
+
   log('Profile button added for @' + username);
 }
 
