@@ -244,3 +244,52 @@
     background-color: #1e2732;
   }
 }
+
+/* TweetDeck / X Pro specific styles */
+.tweetdeck-list-btn {
+  background: rgba(29, 155, 240, 0.15);
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  color: #1d9bf0;
+  padding: 0;
+  line-height: 1;
+}
+
+.tweetdeck-list-btn:hover {
+  background-color: rgba(29, 155, 240, 0.25);
+  transform: scale(1.1);
+}
+
+.tweetdeck-list-btn:active {
+  background-color: rgba(29, 155, 240, 0.35);
+  transform: scale(0.95);
+}
+
+.tweetdeck-list-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tweetdeck-list-btn-container {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+/* TweetDeck dark mode (TweetDeck is typically dark) */
+.tweetdeck-list-btn {
+  background: rgba(29, 155, 240, 0.2);
+}
+
+.tweetdeck-list-btn:hover {
+  background-color: rgba(29, 155, 240, 0.35);
+}

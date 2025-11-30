@@ -1,7 +1,12 @@
 // Twitter List Quick Add Extension
 // Adds a button to quickly add users to lists while browsing
 
-const GRAPHQL_ENDPOINT = 'https://x.com/i/api/graphql';
+// Detect if we're on TweetDeck/X Pro
+const isTweetDeck = window.location.hostname === 'pro.x.com' || window.location.hostname === 'tweetdeck.twitter.com';
+
+// Use the appropriate API endpoint based on site
+const GRAPHQL_ENDPOINT = isTweetDeck ? 'https://pro.x.com/i/api/graphql' : 'https://x.com/i/api/graphql';
+
 const ADD_MEMBER_QUERY_ID = 'EadD8ivrhZhYQr2pDmCpjA';
 const REMOVE_MEMBER_QUERY_ID = 'B5tMzrMYuFHJex_4EXFTSw';
 const LIST_MEMBERS_QUERY_ID = '8ybCIfKAYYex7FdmJ0PzwQ';
@@ -733,6 +738,212 @@ function createTimelineListButton(username) {
   return button;
 }
 
+// Create a list button for TweetDeck tweets (smaller, fits the compact UI)
+function createTweetDeckListButton(username, userId = null) {
+  const button = document.createElement('button');
+  button.className = 'tweetdeck-list-btn';
+  button.innerHTML = '📋';
+  button.title = `Add @${username} to list`;
+  
+  // Store userId if we have it
+  if (userId) {
+    button.dataset.userId = userId;
+  }
+
+  button.addEventListener('click', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    button.textContent = '...';
+    button.disabled = true;
+
+    // Use stored userId if available, otherwise look it up
+    let finalUserId = button.dataset.userId;
+    
+    if (!finalUserId) {
+      finalUserId = await getUserIdByUsername(username);
+    }
+    
+    if (!finalUserId) {
+      alert('Could not find user ID. Try again.');
+      button.innerHTML = '📋';
+      button.disabled = false;
+      return;
+    }
+
+    const lists = await fetchLists();
+
+    if (lists.length === 0) {
+      alert('No lists found. Create a list first on Twitter.');
+      button.innerHTML = '📋';
+      button.disabled = false;
+      return;
+    }
+
+    showListDropdown(lists, finalUserId, button, username);
+  });
+
+  return button;
+}
+
+// Try to extract user ID from React fiber props in the DOM
+function extractUserIdFromElement(element) {
+  try {
+    // Look for React fiber keys that contain user data
+    const keys = Object.keys(element);
+    for (const key of keys) {
+      if (key.startsWith('__reactFiber$') || key.startsWith('__reactProps$')) {
+        const fiber = element[key];
+        
+        // Traverse the fiber tree looking for user data
+        const searchFiber = (node, depth = 0) => {
+          if (!node || depth > 15) return null;
+          
+          // Check memoizedProps for user data
+          if (node.memoizedProps) {
+            const props = node.memoizedProps;
+            
+            // Look for user object with rest_id
+            if (props.user?.rest_id) {
+              return props.user.rest_id;
+            }
+            if (props.data?.user?.rest_id) {
+              return props.data.user.rest_id;
+            }
+            if (props.tweet?.core?.user_results?.result?.rest_id) {
+              return props.tweet.core.user_results.result.rest_id;
+            }
+            if (props.result?.core?.user_results?.result?.rest_id) {
+              return props.result.core.user_results.result.rest_id;
+            }
+          }
+          
+          // Check child and sibling
+          return searchFiber(node.child, depth + 1) || 
+                 searchFiber(node.sibling, depth + 1) ||
+                 searchFiber(node.return, depth + 1);
+        };
+        
+        const userId = searchFiber(fiber);
+        if (userId) return userId;
+      }
+    }
+  } catch (e) {
+    log('TweetDeck: Error extracting userId from React:', e);
+  }
+  return null;
+}
+
+// Add buttons to TweetDeck tweets
+function addButtonsToTweetDeckTweets() {
+  // TweetDeck uses article elements with data-testid="tweet" similar to regular Twitter
+  // but the structure inside may differ
+  const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+  
+  if (tweets.length > 0) {
+    log('TweetDeck: Scanning - found', tweets.length, 'tweets');
+  }
+
+  let added = 0;
+  let skipped = 0;
+
+  tweets.forEach(tweet => {
+    // Generate a unique ID for each tweet
+    let tweetId = tweet.getAttribute('data-td-processed');
+    if (tweetId) {
+      skipped++;
+      return;
+    }
+    
+    // Mark as processed
+    tweetId = 'td-' + Math.random().toString(36).substr(2, 9);
+    tweet.setAttribute('data-td-processed', tweetId);
+
+    // Find the user area - TweetDeck structure
+    // Look for the username/handle area
+    const userNameArea = tweet.querySelector('[data-testid="User-Name"]');
+    
+    if (!userNameArea) {
+      log('TweetDeck: No User-Name area found');
+      return;
+    }
+
+    // Check if button already exists
+    if (userNameArea.querySelector('.tweetdeck-list-btn')) {
+      skipped++;
+      return;
+    }
+
+    // Find username from the tweet
+    // Look for links that go to user profiles
+    const userLinks = tweet.querySelectorAll('a[href^="/"]');
+    let username = null;
+    
+    for (const link of userLinks) {
+      const href = link.getAttribute('href');
+      // Match profile links like /username (not /username/status/...)
+      if (href && href.match(/^\/[a-zA-Z0-9_]+$/) && !href.match(/^\/(home|explore|notifications|messages|settings|compose|search|i|hashtag)/)) {
+        username = href.replace('/', '').toLowerCase();
+        break;
+      }
+    }
+
+    if (!username) {
+      // Alternative: look for @username text
+      const handleElements = tweet.querySelectorAll('span, div');
+      for (const el of handleElements) {
+        const text = el.textContent.trim();
+        if (text.match(/^@[a-zA-Z0-9_]+$/) && el.children.length === 0) {
+          username = text.replace('@', '').toLowerCase();
+          break;
+        }
+      }
+    }
+
+    if (!username) {
+      log('TweetDeck: Could not extract username');
+      return;
+    }
+
+    // Try to extract user ID from React fiber props
+    let userId = extractUserIdFromElement(tweet);
+    
+    // Also try from the user link element
+    if (!userId) {
+      const userLinks = tweet.querySelectorAll('a[href^="/"]');
+      for (const link of userLinks) {
+        const href = link.getAttribute('href');
+        if (href && href.match(/^\/[a-zA-Z0-9_]+$/) && !href.match(/^\/(home|explore|notifications|messages|settings|compose|search|i|hashtag)/)) {
+          userId = extractUserIdFromElement(link);
+          if (userId) break;
+        }
+      }
+    }
+    
+    if (userId) {
+      log('TweetDeck: Found userId', userId, 'for', username);
+    }
+
+    // Create and add button (pass userId if we found it)
+    const button = createTweetDeckListButton(username, userId);
+    
+    const buttonContainer = document.createElement('span');
+    buttonContainer.className = 'tweetdeck-list-btn-container';
+    buttonContainer.style.marginLeft = '6px';
+    buttonContainer.style.display = 'inline-flex';
+    buttonContainer.style.alignItems = 'center';
+    buttonContainer.appendChild(button);
+
+    // Append to user name area
+    userNameArea.appendChild(buttonContainer);
+    added++;
+  });
+
+  if (added > 0) {
+    log('TweetDeck: Added', added, 'buttons,', skipped, 'skipped');
+  }
+}
+
 // Show dropdown with lists
 async function showListDropdown(lists, userId, button, username = '') {
   log('🔍 DEBUG: showListDropdown called with userId:', userId, 'username:', username);
@@ -1099,27 +1310,39 @@ async function checkAndAddProfileButton() {
 
 // Main initialization
 function init() {
-  log('Extension initialized');
+  log('Extension initialized', isTweetDeck ? '(TweetDeck mode)' : '(Standard mode)');
 
   // Extract user ID early
   extractMyUserId();
 
-  checkAndAddProfileButton();
-  addButtonsToTimelineTweets();
+  if (isTweetDeck) {
+    // TweetDeck mode
+    addButtonsToTweetDeckTweets();
+  } else {
+    // Standard Twitter mode
+    checkAndAddProfileButton();
+    addButtonsToTimelineTweets();
+  }
 
   let lastUrl = location.href;
   const observer = new MutationObserver(() => {
     const url = location.href;
 
-    if (url !== lastUrl) {
-      lastUrl = url;
-      processedTweets.clear();
-      setTimeout(() => {
-        checkAndAddProfileButton();
-        addButtonsToTimelineTweets();
-      }, 1000);
+    if (isTweetDeck) {
+      // TweetDeck: just keep scanning for new tweets
+      addButtonsToTweetDeckTweets();
     } else {
-      addButtonsToTimelineTweets();
+      // Standard Twitter
+      if (url !== lastUrl) {
+        lastUrl = url;
+        processedTweets.clear();
+        setTimeout(() => {
+          checkAndAddProfileButton();
+          addButtonsToTimelineTweets();
+        }, 1000);
+      } else {
+        addButtonsToTimelineTweets();
+      }
     }
   });
 
