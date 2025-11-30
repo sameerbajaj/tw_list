@@ -937,11 +937,10 @@ async function showListDropdown(lists, userId, button, username = '') {
 }
 
 // Add buttons to timeline tweets
-// Add buttons to timeline tweets
 function addButtonsToTimelineTweets() {
   // Skip if on profile page (user only wants the header button there)
   const isProfilePage = window.location.pathname.match(/^\/[^\/]+$/) &&
-    !window.location.pathname.match(/^\/(home|explore|notifications|messages|settings|compose)/);
+    !window.location.pathname.match(/^\/(home|explore|notifications|messages|settings|compose|search|i|hashtag)/);
   if (isProfilePage) return;
 
   const tweets = document.querySelectorAll('article[data-testid="tweet"]');
