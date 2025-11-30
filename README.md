@@ -8,6 +8,7 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 - 👤 **Profile buttons** - Add from profile pages
 - ✓ **View current lists** - See which lists users are already on
 - ➕➖ **Add & Remove** - Manage list membership with checkboxes
+- 📝 **List Manager** - View and edit all members of your private lists in one place
 - ⚡ **Smart caching** - 24-hour localStorage cache for instant lookups
 - 🛡️ **Rate limiting** - Built-in protection to keep your account safe
 - ⚙️ **Safety presets** - Conservative, Balanced, or Aggressive modes
@@ -45,6 +46,20 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 3. Click it to see your lists with current membership status
 4. Check/uncheck boxes to add/remove from lists
 5. Click "Save Changes"
+
+### Using the List Manager (NEW!)
+1. Click the extension icon in your browser toolbar
+2. Switch to the "📋 List Manager" tab
+3. Select a list from the dropdown
+4. Click "Fetch Members" to load all current members
+5. View all handles in the text area below
+6. **To add a member**: Type their handle on a new line (with or without @)
+7. **To remove a member**: Delete their line from the list
+8. Click "Save Changes" button when you're ready
+9. Review the confirmation dialog showing all pending changes
+10. Confirm to apply the changes to your list
+
+**Tip**: You can add/remove multiple members at once by editing the text area. The "Save Changes" button will show you how many additions (+) and removals (-) are pending!
 
 ### Settings (Click Extension Icon)
 **Conservative (Safest)**
