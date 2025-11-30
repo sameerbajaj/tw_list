@@ -95,6 +95,7 @@ const LISTS_QUERY_ID = 'xzVN0C62pNPWVfUjixdzeQ';
 const ADD_MEMBER_QUERY_ID = 'EadD8ivrhZhYQr2pDmCpjA';
 const REMOVE_MEMBER_QUERY_ID = 'B5tMzrMYuFHJex_4EXFTSw';
 const USER_BY_SCREEN_NAME_QUERY_ID = '-oaLodhGbbnzJBACb1kk2Q';
+const DELETE_LIST_QUERY_ID = 'UnN9Th1BDbeLjpgjGSpL3Q';
 const BEARER_TOKEN = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 
 let currentList = null;
@@ -486,6 +487,48 @@ async function removeUserFromList(listId, userId) {
   }
 }
 
+async function deleteList(listId) {
+  const csrfToken = await getCsrfToken();
+  if (!csrfToken) return false;
+
+  try {
+    const response = await fetch(`${GRAPHQL_ENDPOINT}/${DELETE_LIST_QUERY_ID}/DeleteList`, {
+      method: 'POST',
+      headers: {
+        'authorization': BEARER_TOKEN,
+        'x-csrf-token': csrfToken,
+        'content-type': 'application/json',
+        'x-twitter-client-language': 'en'
+      },
+      body: JSON.stringify({
+        variables: {
+          listId: listId
+        },
+        queryId: DELETE_LIST_QUERY_ID
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Delete list API error - Status:', response.status, 'Response:', data);
+      return false;
+    }
+
+    console.log('✅ Delete list API response:', data);
+
+    // Check if deletion was successful
+    if (data.data?.list_delete === 'Done') {
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('ERROR deleting list:', error);
+    return false;
+  }
+}
+
 function showStatus(message, type = 'info') {
   const statusEl = document.getElementById('status');
   statusEl.textContent = message;
@@ -722,8 +765,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  const deleteBtn = document.getElementById('delete-list-btn');
+
   listSelect.addEventListener('change', () => {
-    fetchBtn.disabled = !listSelect.value;
+    const hasSelection = !!listSelect.value;
+    fetchBtn.disabled = !hasSelection;
+    deleteBtn.disabled = !hasSelection;
+  });
+
+  // Delete button click handler
+  deleteBtn.addEventListener('click', async () => {
+    const listId = listSelect.value;
+    if (!listId) return;
+
+    const selectedList = lists.find(l => l.id === listId);
+    if (!selectedList) return;
+
+    // Confirmation dialog
+    const confirmMessage = `⚠️ Are you sure you want to DELETE the list "${selectedList.name}"?\n\nThis action cannot be undone!\n\nAll members will be removed and the list will be permanently deleted.`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    // Disable button during deletion
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = '⏳';
+
+    const success = await deleteList(listId);
+
+    if (success) {
+      showStatus(`✅ List "${selectedList.name}" deleted successfully`, 'success');
+
+      // Remove from lists array
+      const index = lists.findIndex(l => l.id === listId);
+      if (index > -1) {
+        lists.splice(index, 1);
+      }
+
+      // Remove from dropdown
+      const optionToRemove = listSelect.querySelector(`option[value="${listId}"]`);
+      if (optionToRemove) {
+        optionToRemove.remove();
+      }
+
+      // Reset UI
+      listSelect.value = '';
+      fetchBtn.disabled = true;
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = '🗑️';
+
+      // Clear textarea and current list
+      textarea.value = '';
+      currentList = null;
+      currentMembers.clear();
+      updateMemberCount();
+
+      // Update dropdown message if no lists left
+      if (lists.length === 0) {
+        listSelect.innerHTML = '<option value="">No private lists found</option>';
+      }
+    } else {
+      showStatus(`❌ Failed to delete list "${selectedList.name}"`, 'error');
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = '🗑️';
+    }
   });
 
   fetchBtn.addEventListener('click', async () => {

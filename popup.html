@@ -359,6 +359,29 @@
       transform: translateY(0);
       box-shadow: none;
     }
+
+    .btn-delete {
+      padding: 10px 12px;
+      background-color: #ffffff;
+      color: #536471;
+      border: 1px solid #cfd9de;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .btn-delete:hover:not(:disabled) {
+      background-color: #fee;
+      border-color: #f44;
+      color: #c00;
+    }
+
+    .btn-delete:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 
@@ -375,9 +398,14 @@
 
     <div class="section">
       <label for="list-select">Select a List</label>
-      <select id="list-select">
-        <option value="">Loading lists...</option>
-      </select>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <select id="list-select" style="flex: 1;">
+          <option value="">Loading lists...</option>
+        </select>
+        <button id="delete-list-btn" class="btn-delete" disabled title="Delete this list">
+          🗑️
+        </button>
+      </div>
     </div>
 
     <button id="fetch-btn" disabled>

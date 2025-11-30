@@ -58,6 +58,7 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 8. Click "Save Changes" button when you're ready
 9. Review the confirmation dialog showing all pending changes
 10. Confirm to apply the changes to your list
+11. **To delete the entire list**: Click the 🗑️ button next to the dropdown and confirm
 
 **Tip**: You can add/remove multiple members at once by editing the text area. The "Save Changes" button will show you how many additions (+) and removals (-) are pending!
 
