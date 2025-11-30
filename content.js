@@ -400,10 +400,15 @@ async function fetchLists() {
         for (const item of entry.content.items) {
           const list = item.item?.itemContent?.list;
           if (list && list.id_str && list.name) {
-            cachedLists.push({
-              id: list.id_str,
-              name: list.name
-            });
+            // Filter: Only show Private lists as they are owned by the user
+            if (list.mode === 'Private') {
+              cachedLists.push({
+                id: list.id_str,
+                name: list.name
+              });
+            } else {
+              log('Skipping list (not private):', list.name, list.mode);
+            }
           }
         }
       }
@@ -411,10 +416,15 @@ async function fetchLists() {
       else if (entry.content?.itemContent?.list) {
         const list = entry.content.itemContent.list;
         if (list.id_str && list.name) {
-          cachedLists.push({
-            id: list.id_str,
-            name: list.name
-          });
+          // Filter: Only show Private lists
+          if (list.mode === 'Private') {
+            cachedLists.push({
+              id: list.id_str,
+              name: list.name
+            });
+          } else {
+            log('Skipping list (not private):', list.name, list.mode);
+          }
         }
       }
     }
