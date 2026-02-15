@@ -1,9 +1,10 @@
 // Twitter List Manager & Settings Popup
 
 // ===== TAB MANAGEMENT =====
+// ===== TAB MANAGEMENT =====
 function switchTab(tabName) {
-  // Update tab buttons
-  document.querySelectorAll('.tab').forEach(tab => {
+  // Update nav buttons
+  document.querySelectorAll('.nav-item').forEach(tab => {
     tab.classList.remove('active');
     if (tab.dataset.tab === tabName) {
       tab.classList.add('active');
@@ -12,9 +13,15 @@ function switchTab(tabName) {
 
   // Update tab content
   document.querySelectorAll('.tab-content').forEach(content => {
-    content.classList.remove('active');
+    content.classList.add('hidden');
+    content.classList.remove('active'); // legacy support
   });
-  document.getElementById(tabName).classList.add('active');
+
+  const selectedContent = document.getElementById(tabName);
+  if (selectedContent) {
+    selectedContent.classList.remove('hidden');
+    selectedContent.classList.add('active');
+  }
 }
 
 // ===== SETTINGS MANAGEMENT =====
@@ -66,7 +73,7 @@ function saveSettings(preset, skipMembershipCheck) {
 function updateSettingsUI() {
   const settings = loadSettings();
 
-  document.querySelectorAll('#settings .preset').forEach(el => {
+  document.querySelectorAll('#settings .preset-card').forEach(el => {
     el.classList.remove('selected');
     if (el.dataset.preset === settings.preset) {
       el.classList.add('selected');
@@ -530,12 +537,28 @@ async function deleteList(listId) {
 }
 
 function showStatus(message, type = 'info') {
-  const statusEl = document.getElementById('status');
-  statusEl.textContent = message;
-  statusEl.className = `status visible ${type}`;
+  const container = document.getElementById('status');
+  const toast = document.createElement('div');
+  toast.className = `status-toast ${type}`;
 
+  // Icon based on type
+  let icon = 'ℹ️';
+  if (type === 'success') icon = '✅';
+  if (type === 'error') icon = '⚠️';
+
+  toast.innerHTML = `<span style="font-size: 16px;">${icon}</span><span>${message}</span>`;
+
+  container.appendChild(toast);
+
+  // Remove after 5 seconds
   setTimeout(() => {
-    statusEl.classList.remove('visible');
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    setTimeout(() => {
+      if (container.contains(toast)) {
+        container.removeChild(toast);
+      }
+    }, 300);
   }, 5000);
 }
 
@@ -704,16 +727,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Settings preset selection
-  document.querySelectorAll('#settings .preset').forEach(preset => {
+  document.querySelectorAll('#settings .preset-card').forEach(preset => {
     preset.addEventListener('click', () => {
-      document.querySelectorAll('#settings .preset').forEach(p => p.classList.remove('selected'));
+      document.querySelectorAll('#settings .preset-card').forEach(p => p.classList.remove('selected'));
       preset.classList.add('selected');
     });
   });
 
   // Save settings button
   document.getElementById('save').addEventListener('click', () => {
-    const selected = document.querySelector('#settings .preset.selected');
+    const selected = document.querySelector('#settings .preset-card.selected');
     if (selected) {
       const preset = selected.dataset.preset;
       const skipMembershipCheck = document.getElementById('skip-membership-check').checked;
@@ -724,7 +747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.textContent = '✓ Saved!';
       setTimeout(() => {
         btn.textContent = originalText;
-        window.close();
+        // window.close(); // Keep open to show feedback
       }, 1000);
     }
   });

@@ -754,7 +754,7 @@ function createTweetDeckListButton(username, userId = null) {
   button.className = 'tweetdeck-list-btn';
   button.innerHTML = '📋';
   button.title = `Add @${username} to list`;
-  
+
   // Store userId if we have it
   if (userId) {
     button.dataset.userId = userId;
@@ -769,11 +769,11 @@ function createTweetDeckListButton(username, userId = null) {
 
     // Use stored userId if available, otherwise look it up
     let finalUserId = button.dataset.userId;
-    
+
     if (!finalUserId) {
       finalUserId = await getUserIdByUsername(username);
     }
-    
+
     if (!finalUserId) {
       alert('Could not find user ID. Try again.');
       button.innerHTML = '📋';
@@ -804,15 +804,15 @@ function extractUserIdFromElement(element) {
     for (const key of keys) {
       if (key.startsWith('__reactFiber$') || key.startsWith('__reactProps$')) {
         const fiber = element[key];
-        
+
         // Traverse the fiber tree looking for user data
         const searchFiber = (node, depth = 0) => {
           if (!node || depth > 15) return null;
-          
+
           // Check memoizedProps for user data
           if (node.memoizedProps) {
             const props = node.memoizedProps;
-            
+
             // Look for user object with rest_id
             if (props.user?.rest_id) {
               return props.user.rest_id;
@@ -827,13 +827,13 @@ function extractUserIdFromElement(element) {
               return props.result.core.user_results.result.rest_id;
             }
           }
-          
+
           // Check child and sibling
-          return searchFiber(node.child, depth + 1) || 
-                 searchFiber(node.sibling, depth + 1) ||
-                 searchFiber(node.return, depth + 1);
+          return searchFiber(node.child, depth + 1) ||
+            searchFiber(node.sibling, depth + 1) ||
+            searchFiber(node.return, depth + 1);
         };
-        
+
         const userId = searchFiber(fiber);
         if (userId) return userId;
       }
@@ -849,7 +849,7 @@ function addButtonsToTweetDeckTweets() {
   // TweetDeck uses article elements with data-testid="tweet" similar to regular Twitter
   // but the structure inside may differ
   const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-  
+
   if (tweets.length > 0) {
     log('TweetDeck: Scanning - found', tweets.length, 'tweets');
   }
@@ -864,7 +864,7 @@ function addButtonsToTweetDeckTweets() {
       skipped++;
       return;
     }
-    
+
     // Mark as processed
     tweetId = 'td-' + Math.random().toString(36).substr(2, 9);
     tweet.setAttribute('data-td-processed', tweetId);
@@ -872,7 +872,7 @@ function addButtonsToTweetDeckTweets() {
     // Find the user area - TweetDeck structure
     // Look for the username/handle area
     const userNameArea = tweet.querySelector('[data-testid="User-Name"]');
-    
+
     if (!userNameArea) {
       log('TweetDeck: No User-Name area found');
       return;
@@ -888,7 +888,7 @@ function addButtonsToTweetDeckTweets() {
     // Look for links that go to user profiles
     const userLinks = tweet.querySelectorAll('a[href^="/"]');
     let username = null;
-    
+
     for (const link of userLinks) {
       const href = link.getAttribute('href');
       // Match profile links like /username (not /username/status/...)
@@ -917,7 +917,7 @@ function addButtonsToTweetDeckTweets() {
 
     // Try to extract user ID from React fiber props
     let userId = extractUserIdFromElement(tweet);
-    
+
     // Also try from the user link element
     if (!userId) {
       const userLinks = tweet.querySelectorAll('a[href^="/"]');
@@ -929,14 +929,14 @@ function addButtonsToTweetDeckTweets() {
         }
       }
     }
-    
+
     if (userId) {
       log('TweetDeck: Found userId', userId, 'for', username);
     }
 
     // Create and add button (pass userId if we found it)
     const button = createTweetDeckListButton(username, userId);
-    
+
     const buttonContainer = document.createElement('span');
     buttonContainer.className = 'tweetdeck-list-btn-container';
     buttonContainer.style.marginLeft = '6px';
@@ -1318,6 +1318,120 @@ async function checkAndAddProfileButton() {
   log('Profile button added for @' + username);
 }
 
+// Add buttons to User Cells (Following/Followers/Lists)
+function addButtonsToUserCells() {
+  // Broad selector to catch user cells.
+  const userCells = Array.from(document.querySelectorAll('[data-testid="UserCell"]'));
+
+  // Priority 2: If we are on the Following page, sometimes cells are just buttons with specific structure
+  if (location.pathname.includes('/following') || location.pathname.includes('/followers')) {
+    const potentialCells = document.querySelectorAll('button[role="button"], div[role="button"]');
+    potentialCells.forEach(el => {
+      if (el.querySelector('a[href^="/"]') &&
+        el.querySelector('button[role="button"]') &&
+        !el.hasAttribute('data-testid')) {
+        userCells.push(el);
+      }
+    });
+  }
+
+  userCells.forEach(cell => {
+    // Check if already processed
+    if (cell.querySelector('.user-cell-list-btn-container')) return;
+
+    // Extract username
+    let username = null;
+    const userLinks = cell.querySelectorAll('a[href^="/"]');
+
+    for (const link of userLinks) {
+      const href = link.getAttribute('href');
+      const parts = href.split('/');
+      if (parts.length === 2 && parts[1]) {
+        const potential = parts[1].toLowerCase();
+        if (!['home', 'explore', 'notifications', 'messages', 'i', 'compose', 'settings'].includes(potential)) {
+          username = potential;
+          break;
+        }
+      }
+    }
+
+    // Fallback attempts
+    if (!username) {
+      const text = cell.innerText;
+      const match = text.match(/@([a-zA-Z0-9_]+)/);
+      if (match) username = match[1].toLowerCase();
+    }
+
+    if (!username) return;
+
+    // Create button
+    const button = createTimelineListButton(username);
+    button.style.fontSize = '14px';
+    button.style.background = 'transparent'; // Ensure transparent background
+    button.style.border = 'none';
+    button.style.padding = '2px'; // Reduced padding
+    button.style.cursor = 'pointer';
+    button.style.lineHeight = '1';
+
+    const container = document.createElement('div');
+    container.className = 'user-cell-list-btn-container';
+    container.style.display = 'inline-flex';
+    container.style.alignItems = 'center';
+    container.style.zIndex = '999';
+    container.style.flexShrink = '0'; // Prevent shrinking/growing
+    container.appendChild(button);
+
+    // Strategy 1: PREFERRED - Append to User Name / Handle area.
+    // This is safer because it puts the button next to the name, avoiding the flex-spacer issue between name and follow button.
+    const userNameElement = cell.querySelector('div[data-testid="User-Name"]');
+    if (userNameElement) {
+      // Reduced margin significantly
+      container.style.marginLeft = '4px';
+
+      // Try appending to the first child (horizontal row usually containing name and verified badge)
+      const row = userNameElement.querySelector('div:first-child');
+
+      // Check if the row is actually a flex row (it usually is)
+      if (row && window.getComputedStyle(row).display.includes('flex')) {
+        row.appendChild(container);
+        return;
+      }
+
+      // Fallback: append to the User-Name container itself
+      // Ensure it's displayed inline or flex to sit next to it
+      userNameElement.style.display = 'flex'; // Force flex if not present
+      userNameElement.style.alignItems = 'center';
+      userNameElement.appendChild(container);
+      return;
+    }
+
+    // Strategy 2: Insert before the "Follow"/"Following" button
+    // ONLY if we couldn't find the name area.
+    const buttons = cell.querySelectorAll('button[role="button"]');
+    let actionButton = null;
+    buttons.forEach(btn => {
+      if (btn !== cell) actionButton = btn;
+    });
+
+    if (actionButton) {
+      const btnContainer = actionButton.parentElement;
+      if (btnContainer) {
+        container.style.marginRight = '4px'; // Reduced margin
+        btnContainer.parentElement.insertBefore(container, btnContainer);
+        return;
+      }
+    }
+
+    // Strategy 3: Last resort append
+    if (cell.children.length > 0) {
+      const lastChild = cell.children[cell.children.length - 1];
+      lastChild.appendChild(container);
+    } else {
+      cell.appendChild(container);
+    }
+  });
+}
+
 // Main initialization
 function init() {
   log('Extension initialized', isTweetDeck ? '(TweetDeck mode)' : '(Standard mode)');
@@ -1332,6 +1446,7 @@ function init() {
     // Standard Twitter mode
     checkAndAddProfileButton();
     addButtonsToTimelineTweets();
+    addButtonsToUserCells();
   }
 
   let lastUrl = location.href;
@@ -1349,9 +1464,11 @@ function init() {
         setTimeout(() => {
           checkAndAddProfileButton();
           addButtonsToTimelineTweets();
+          addButtonsToUserCells();
         }, 1000);
       } else {
         addButtonsToTimelineTweets();
+        addButtonsToUserCells();
       }
     }
   });

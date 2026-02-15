@@ -1,485 +1,122 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <style>
-    body {
-      width: 420px;
-      min-height: 500px;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      margin: 0;
-      background-color: #ffffff;
-    }
-
-    .tabs {
-      display: flex;
-      border-bottom: 1px solid #eff3f4;
-      background-color: #ffffff;
-    }
-
-    .tab {
-      flex: 1;
-      padding: 12px 16px;
-      border: none;
-      background: none;
-      font-size: 14px;
-      font-weight: 600;
-      color: #536471;
-      cursor: pointer;
-      transition: all 0.2s;
-      border-bottom: 2px solid transparent;
-    }
-
-    .tab:hover {
-      background-color: #f7f9fa;
-      color: #0f1419;
-    }
-
-    .tab.active {
-      color: #1d9bf0;
-      border-bottom-color: #1d9bf0;
-    }
-
-    .tab-content {
-      display: none;
-      padding: 16px;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    h2 {
-      margin: 0 0 12px 0;
-      font-size: 18px;
-      font-weight: 700;
-      color: #0f1419;
-    }
-
-    .subtitle {
-      font-size: 14px;
-      color: #536471;
-      margin-bottom: 20px;
-    }
-
-    .section {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      font-weight: 600;
-      font-size: 14px;
-      color: #0f1419;
-      margin-bottom: 8px;
-    }
-
-    select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #cfd9de;
-      border-radius: 8px;
-      font-size: 14px;
-      color: #0f1419;
-      background-color: #ffffff;
-      cursor: pointer;
-      transition: border-color 0.2s;
-      box-sizing: border-box;
-    }
-
-    select:hover {
-      border-color: #1d9bf0;
-    }
-
-    select:focus {
-      outline: none;
-      border-color: #1d9bf0;
-      box-shadow: 0 0 0 2px rgba(29, 155, 240, 0.2);
-    }
-
-    .members-label {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
-    .member-count {
-      font-size: 12px;
-      color: #536471;
-      font-weight: normal;
-    }
-
-    textarea {
-      width: 100%;
-      min-height: 200px;
-      padding: 12px;
-      border: 1px solid #cfd9de;
-      border-radius: 8px;
-      font-size: 13px;
-      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-      resize: vertical;
-      box-sizing: border-box;
-      transition: border-color 0.2s;
-    }
-
-    textarea:hover {
-      border-color: #1d9bf0;
-    }
-
-    textarea:focus {
-      outline: none;
-      border-color: #1d9bf0;
-      box-shadow: 0 0 0 2px rgba(29, 155, 240, 0.2);
-    }
-
-    textarea::placeholder {
-      color: #aab8c2;
-    }
-
-    .help-text {
-      font-size: 12px;
-      color: #657786;
-      margin-top: 8px;
-      line-height: 1.4;
-    }
-
-    .loading {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid #ffffff;
-      border-radius: 50%;
-      border-top-color: transparent;
-      animation: spinner 0.6s linear infinite;
-      vertical-align: middle;
-      margin-left: 8px;
-    }
-
-    @keyframes spinner {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    .preset {
-      border: 1px solid #eff3f4;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-      position: relative;
-    }
-
-    .preset:hover {
-      border-color: #1d9bf0;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    }
-
-    .preset:active {
-      transform: translateY(0);
-    }
-
-    .preset.selected {
-      border-color: #1d9bf0;
-      background-color: #fcfdfe;
-      box-shadow: 0 0 0 2px rgba(29, 155, 240, 0.2), 0 4px 12px rgba(0, 0, 0, 0.08);
-    }
-
-    .preset-name {
-      font-weight: 700;
-      font-size: 15px;
-      color: #0f1419;
-      margin-bottom: 4px;
-    }
-
-    .preset-desc {
-      font-size: 13px;
-      color: #536471;
-      line-height: 1.4;
-    }
-
-    .preset-stats {
-      font-size: 12px;
-      color: #657786;
-      margin-top: 8px;
-      font-family: monospace;
-      background: #f7f9fa;
-      padding: 4px 8px;
-      border-radius: 6px;
-      display: inline-block;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 10px;
-      font-weight: 700;
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .badge.safe {
-      background-color: #d4edda;
-      color: #155724;
-    }
-
-    .badge.balanced {
-      background-color: #fff3cd;
-      color: #856404;
-    }
-
-    .badge.risky {
-      background-color: #f8d7da;
-      color: #721c24;
-    }
-
-    .status {
-      margin-top: 20px;
-      padding: 16px;
-      background-color: #f7f9fa;
-      border-radius: 12px;
-      font-size: 13px;
-      display: none;
-    }
-
-    .status.visible {
-      display: block;
-    }
-
-    .status.success {
-      background-color: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-
-    .status.error {
-      background-color: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-
-    .status.info {
-      background-color: #d1ecf1;
-      color: #0c5460;
-      border: 1px solid #bee5eb;
-    }
-
-    .status-label {
-      font-weight: 700;
-      color: #0f1419;
-      margin-bottom: 8px;
-    }
-
-    .status-value {
-      color: #536471;
-      line-height: 1.5;
-    }
-
-    .actions {
-      margin-top: 20px;
-      display: flex;
-      gap: 12px;
-    }
-
-    button {
-      padding: 12px 16px;
-      border: none;
-      border-radius: 24px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    #fetch-btn {
-      width: 100%;
-      background: linear-gradient(to bottom, #1d9bf0, #1a8cd8);
-      color: white;
-      margin-bottom: 16px;
-    }
-
-    #fetch-btn:hover:not(:disabled) {
-      background: linear-gradient(to bottom, #1a8cd8, #167ac0);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 10px rgba(29, 155, 240, 0.3);
-    }
-
-    #fetch-btn:active:not(:disabled) {
-      transform: translateY(0);
-      box-shadow: none;
-    }
-
-    .btn-primary {
-      flex: 1;
-      background: linear-gradient(to bottom, #1d9bf0, #1a8cd8);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: linear-gradient(to bottom, #1a8cd8, #167ac0);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 10px rgba(29, 155, 240, 0.3);
-    }
-
-    .btn-primary:active {
-      transform: translateY(0);
-      box-shadow: none;
-    }
-
-    .btn-secondary {
-      flex: 1;
-      background-color: #ffffff;
-      color: #0f1419;
-      border: 1px solid #cfd9de;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-    }
-
-    .btn-secondary:hover {
-      background-color: #f7f9fa;
-      border-color: #c4cfd6;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
-    }
-
-    .btn-secondary:active {
-      transform: translateY(0);
-      box-shadow: none;
-    }
-
-    .btn-delete {
-      padding: 10px 12px;
-      background-color: #ffffff;
-      color: #536471;
-      border: 1px solid #cfd9de;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.2s;
-      flex-shrink: 0;
-    }
-
-    .btn-delete:hover:not(:disabled) {
-      background-color: #fee;
-      border-color: #f44;
-      color: #c00;
-    }
-
-    .btn-delete:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TwList</title>
+    <link rel="stylesheet" href="popup.css">
 </head>
-
 <body>
-  <div class="tabs">
-    <button class="tab active" data-tab="list-manager">📋 List Manager</button>
-    <button class="tab" data-tab="settings">⚙️ Settings</button>
-  </div>
 
-  <!-- List Manager Tab -->
-  <div id="list-manager" class="tab-content active">
-    <h2>Manage List Members</h2>
-    <div class="subtitle">View and edit members of your private lists</div>
+    <!-- Header -->
+    <header>
+        <h1>TwList</h1>
+        <div class="actions">
+            <!-- Space for top-right actions if needed -->
+        </div>
+    </header>
 
-    <div class="section">
-      <label for="list-select">Select a List</label>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <select id="list-select" style="flex: 1;">
-          <option value="">Loading lists...</option>
-        </select>
-        <button id="delete-list-btn" class="btn-delete" disabled title="Delete this list">
-          🗑️
+    <!-- Main Content -->
+    <main>
+        <!-- List Manager Tab -->
+        <div id="list-manager" class="tab-content active">
+            <div class="card">
+                <div class="form-group">
+                    <label for="list-select">Select a List</label>
+                    <div class="select-wrapper">
+                        <select id="list-select">
+                            <option value="">Loading lists...</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button id="fetch-btn" class="btn btn-primary" disabled>
+                        <span>Fetch Members</span>
+                    </button>
+                    <button id="delete-list-btn" class="btn btn-icon btn-danger" disabled title="Delete this list">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16 6V4.5C16 3.12 14.88 2 13.5 2h-3C9.11 2 8 3.12 8 4.5V6H3v2h1.06l.81 11.21C4.98 20.78 6.28 22 7.86 22h8.27c1.58 0 2.88-1.22 3.01-2.79L19.94 8H21V6h-5zm-6-1.5c0-.28.22-.5.5-.5h3c.27 0 .5.22.5.5V6h-4V4.5zm7.13 14.57c-.04.52-.47.93-1.01.93H7.86c-.53 0-.96-.41-1-1.06L6.07 8h11.85l-.79 11.07zM9 17v-6h2v6H9zm4 0v-6h2v6h-2z"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <label for="members-textarea">Members <span id="member-count" style="font-weight: 400; color: var(--text-secondary); margin-left: 4px;"></span></label>
+                <textarea id="members-textarea" placeholder="Select a list to view members..."></textarea>
+                <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+                  <button id="save-changes-btn" class="btn btn-primary" style="display: none;">Save Changes</button>
+                </div>
+            </div>
+            
+            <div id="status" class="status-container"></div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content hidden">
+            <div class="section-title">Safety Settings</div>
+            <div class="section-subtitle">Choose how aggressively to check memberships to avoid rate limits.</div>
+
+            <div class="preset-grid">
+                <div class="preset-card" data-preset="conservative">
+                    <div class="preset-icon">🐢</div>
+                    <div class="preset-info">
+                        <div class="preset-name">Conservative</div>
+                        <div class="preset-desc">Slow & steady. Best for main accounts.</div>
+                        <div class="badge">Safest</div>
+                    </div>
+                </div>
+
+                <div class="preset-card selected" data-preset="balanced">
+                    <div class="preset-icon">⚖️</div>
+                    <div class="preset-info">
+                        <div class="preset-name">Balanced</div>
+                        <div class="preset-desc">Recommended speed.</div>
+                        <div class="badge">Default</div>
+                    </div>
+                </div>
+
+                <div class="preset-card" data-preset="aggressive">
+                    <div class="preset-icon">🚀</div>
+                    <div class="preset-info">
+                        <div class="preset-name">Aggressive</div>
+                        <div class="preset-desc">Fast. Higher risk of rate limits.</div>
+                        <div class="badge">Risky</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 24px;">
+                <label class="form-group" style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                    <input type="checkbox" id="skip-membership-check" style="width: 20px; height: 20px;">
+                    <div>
+                        <div style="font-weight: 700;">Quick Mode</div>
+                        <div style="font-size: 13px; color: var(--text-secondary);">Skip checking current memberships (Fastest)</div>
+                    </div>
+                </label>
+            </div>
+
+            <div style="margin-top: 24px; display: grid; gap: 12px;">
+                <button id="save" class="btn btn-primary">Save Settings</button>
+                <button id="clear-cache" class="btn btn-secondary">Clear Cache</button>
+            </div>
+            
+             <div class="status-container">
+                <div id="current-status" style="font-size: 12px; color: var(--text-secondary); text-align: center; margin-top: 16px;"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-tab="list-manager">
+            <svg viewBox="0 0 24 24"><path d="M3 4.5C3 3.12 4.12 2 5.5 2h13C19.88 2 21 3.12 21 4.5v15c0 1.38-1.12 2.5-2.5 2.5h-13C4.12 22 3 20.88 3 19.5V4.5zM5.5 4c-.28 0-.5.22-.5.5v15c0 .28.22.5.5.5h13c.27 0 .5-.22.5-.5V4.5c0-.28-.22-.5-.5-.5h-13zM16 10H8V8h8v2zm-8 2h8v2H8v-2z"></path></svg>
+            <span>Lists</span>
         </button>
-      </div>
-    </div>
+        <button class="nav-item" data-tab="settings">
+            <svg viewBox="0 0 24 24"><path d="M13.5 2c-1.38 0-2.5 1.12-2.5 2.5v.5h-1v-.5C10 3.12 8.88 2 7.5 2S5 3.12 5 4.5v.5h-1v-.5C4 3.12 2.88 2 1.5 2H0v22h24V2h-1.5C21.12 2 20 3.12 20 4.5v.5h-1v-.5C19 3.12 17.88 2 16.5 2s-2.5 1.12-2.5 2.5v.5h-1v-.5c0-1.38-1.12-2.5-2.5-2.5zM2 4h1v18H2V4zm3 .5c0-.28.22-.5.5-.5s.5.22.5.5v.5h-1v-.5zm1 1.5h-1v16h1V6zm2-.5c0-.28.22-.5.5-.5s.5.22.5.5v.5h-1v-.5zm1 1.5H8v16H8V6zm3 .5c0-.28.22-.5.5-.5s.5.22.5.5v.5h-1v-.5zm1 1.5h-1v16h1V6zm3-.5c0-.28.22-.5.5-.5s.5.22.5.5v.5h-1v-.5zm1 1.5h-1v16h1V6zm3-.5c0-.28.22-.5.5-.5s.5.22.5.5v.5h-1v-.5zm1 1.5h-1v16h1V6z"></path><path d="M12 22a9.97 9.97 0 0 0 3.25-10.84 5.99 5.99 0 0 0-4.04-4.04A9.99 9.99 0 1 0 12 22zM8.07 15.93a4.004 4.004 0 0 1 7.86 0 8.003 8.003 0 0 1-7.86 0z"></path></svg>
+            <span>Settings</span>
+        </button>
+    </nav>
 
-    <button id="fetch-btn" disabled>
-      Fetch Members
-    </button>
-
-    <div class="section">
-      <div class="members-label">
-        <label for="members-textarea">List Members</label>
-        <span class="member-count" id="member-count"></span>
-      </div>
-      <textarea id="members-textarea"
-        placeholder="Select a list and click 'Fetch Members' to see handles here.&#10;&#10;To add a new member, type their handle (with or without @) on a new line.&#10;&#10;To remove a member, delete their line from this list."></textarea>
-      <div class="help-text">
-        💡 <strong>Tip:</strong> Add handles one per line. Click "Save Changes" when ready. Use @handle or just handle
-        format.
-      </div>
-    </div>
-
-    <button id="save-changes-btn" style="display: none;">
-      Save Changes
-    </button>
-
-    <div id="status" class="status"></div>
-  </div>
-
-  <!-- Settings Tab -->
-  <div id="settings" class="tab-content">
-    <h2>Safety Settings</h2>
-    <div class="subtitle">Choose how aggressively to check list memberships</div>
-
-    <div class="preset" data-preset="conservative">
-      <div class="badge safe">SAFEST</div>
-      <div class="preset-name">🐢 Conservative</div>
-      <div class="preset-desc">Minimal API usage, ideal for main accounts</div>
-      <div class="preset-stats">• 500ms delay • 10 users/10min • Auto quick-mode</div>
-    </div>
-
-    <div class="preset selected" data-preset="balanced">
-      <div class="badge balanced">RECOMMENDED</div>
-      <div class="preset-name">⚖️ Balanced</div>
-      <div class="preset-desc">Good balance of speed and safety</div>
-      <div class="preset-stats">• 300ms delay • 20 users/5min • Manual quick-mode</div>
-    </div>
-
-    <div class="preset" data-preset="aggressive">
-      <div class="badge risky">USE WITH CAUTION</div>
-      <div class="preset-name">🚀 Aggressive</div>
-      <div class="preset-desc">Faster lookups, higher API usage</div>
-      <div class="preset-stats">• 200ms delay • 30 users/5min • Quick-mode optional</div>
-    </div>
-
-    <div class="status">
-      <div class="status-label">Current Status</div>
-      <div class="status-value" id="current-status">Loading...</div>
-    </div>
-
-    <div class="status" style="margin-top: 12px;">
-      <div class="status-label">Advanced Options</div>
-      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 8px;">
-        <input type="checkbox" id="skip-membership-check" style="width: 16px; height: 16px; cursor: pointer;">
-        <span style="font-size: 13px; color: #536471;">
-          Always skip checking which lists users are on (fastest, but won't show current memberships)
-        </span>
-      </label>
-    </div>
-
-    <div class="actions">
-      <button class="btn-secondary" id="clear-cache">Clear Cache</button>
-      <button class="btn-primary" id="save">Save Settings</button>
-    </div>
-  </div>
-
-  <script src="popup.js"></script>
+    <script src="popup.js"></script>
 </body>
-
 </html>
