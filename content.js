@@ -764,13 +764,8 @@ function createTimelineListButton(username) {
 function createTweetDeckListButton(username, userId = null) {
   const button = document.createElement('button');
   button.className = 'tweetdeck-list-btn';
-  button.innerHTML = `
-    <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 18px; height: 18px; fill: currentColor;">
-      <g>
-        <path d="M7 4V3h2v1h6V3h2v1h1.5C19.88 4 21 5.12 21 6.5v12c0 1.38-1.12 2.5-2.5 2.5h-13C4.12 21 3 19.88 3 18.5v-12C3 5.12 4.12 4 5.5 4H7zm0 2H5.5c-.27 0-.5.22-.5.5v12c0 .28.22.5.5.5h13c.27 0 .5-.22.5-.5v-12c0-.28-.22-.5-.5-.5H17v1h-2V6H9v1H7V6zm3 4h4v2h-4v-2zm0 4h4v2h-4v-2z"></path>
-      </g>
-    </svg>
-  `;
+  const iconUrl = chrome.runtime.getURL('icon48.png');
+  button.innerHTML = `<img src="${iconUrl}" style="width: 18px; height: 18px; vertical-align: text-bottom; display: block;" alt="Add to list">`;
   button.title = `Add @${username} to list`;
 
   // Store userId if we have it
@@ -1282,13 +1277,9 @@ async function checkAndAddProfileButton() {
   const button = document.createElement('button');
   button.id = 'quick-list-add-btn';
   button.className = 'profile-list-btn';
-  button.innerHTML = `
-    <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 1.25em; height: 1.25em; fill: currentColor;">
-      <g>
-        <path d="M4.5 3c-1.38 0-2.5 1.12-2.5 2.5v14c0 1.38 1.12 2.5 2.5 2.5h14c1.38 0 2.5-1.12 2.5-2.5v-14c0-1.38-1.12-2.5-2.5-2.5h-14zm-2.5 2.5c0-.28.22-.5.5-.5h14c.27 0 .5.22.5.5v14c0 .28-.22.5-.5.5h-14c-.27 0-.5-.22-.5-.5v-14zm10 4h-2v3h-3v2h3v3h2v-3h3v-2h-3v-3z"></path>
-      </g>
-    </svg>
-  `;
+  /* originalContent will be the image tag string */
+  const iconUrl = chrome.runtime.getURL('icon48.png');
+  button.innerHTML = `<img src="${iconUrl}" style="width: 1.25em; height: 1.25em; vertical-align: text-bottom; display: block;" alt="Add to list">`;
   button.title = 'Quick add to list';
 
   button.addEventListener('click', async (e) => {

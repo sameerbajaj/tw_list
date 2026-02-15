@@ -71,4 +71,33 @@ This was the hardest problem.
 ## Debugging Tips
 -   Use `createTreeWalker` to find text nodes if selectors fail.
 -   Always check `overflow` properties on parent containers if an element is injected but not seen.
--   Use `background: red; border: 2px solid yellow;` temporarily on your injected elements to spot them quickly in crowded UIs.
+
+## 8. Extension Icons & Branding (Key Learnings)
+
+### Manifest V3 Icon Configuration
+-   **Toolbar Visibility**: To ensure the extension icon appears in the browser toolbar, you **MUST** define `default_icon` within the `action` object in `manifest.json`.
+-   **Format Requirement**: This `default_icon` property **MUST** be an object specifying image paths for different sizes (standard keys: "16", "32", "48", "128").
+-   **Structure**:
+    ```json
+    "action": {
+      "default_icon": {
+        "16": "icon16.png",
+        "32": "icon32.png",
+        "48": "icon48.png",
+        "128": "icon128.png"
+      }
+    }
+    ```
+-   **Top-Level Icons**: Defining `icons` at the root of `manifest.json` is necessary for the extensions management page (`chrome://extensions`) but **insufficient** for the toolbar action icon.
+
+### Design Aesthetics
+-   **Full Bleed**: Avoid white borders or padding around the icon. The image should extend to the edges (full bleed) for a modern look.
+-   **Creative Context**: Avoid generic symbols (like puzzle pieces or plain clipboards). Incorporate relevant imagery (e.g., a bird for a Twitter tool) to make the icon unique and thematic.
+-   **Quality**: Prefer high-resolution, polished assets (3D/Glossy style often preferred over flat) to convey a premium feel.
+
+### In-Page Icon Consistency
+-   **The Issue**: Injecting inline SVGs or Emojis into the page creates visual inconsistency if it doesn't match the extension's brand icon.
+-   **The Solution**: Inject the **exact same icon file** used by the extension.
+    1.  **Web Accessible Resources**: Add the icon files (e.g., `icon48.png`) to `web_accessible_resources` -> `resources` in `manifest.json` so the content script can access them.
+    2.  **Content Script injection**: Use `chrome.runtime.getURL('icon48.png')` to resolve the full path and inject an `<img>` tag instead of an `<svg>`.
+    3.  **Result**: Perfect branding consistency across the toolbar and the injected UI elements.
