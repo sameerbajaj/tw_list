@@ -1320,10 +1320,8 @@ async function checkAndAddProfileButton() {
 
 // Add buttons to User Cells (Following/Followers/Lists)
 function addButtonsToUserCells() {
-  // Broad selector to catch user cells.
   const userCells = Array.from(document.querySelectorAll('[data-testid="UserCell"]'));
 
-  // Priority 2: If we are on the Following page, sometimes cells are just buttons with specific structure
   if (location.pathname.includes('/following') || location.pathname.includes('/followers')) {
     const potentialCells = document.querySelectorAll('button[role="button"], div[role="button"]');
     potentialCells.forEach(el => {
@@ -1336,13 +1334,11 @@ function addButtonsToUserCells() {
   }
 
   userCells.forEach(cell => {
-    // Check if already processed
     if (cell.querySelector('.user-cell-list-btn-container')) return;
 
     // Extract username
     let username = null;
     const userLinks = cell.querySelectorAll('a[href^="/"]');
-
     for (const link of userLinks) {
       const href = link.getAttribute('href');
       const parts = href.split('/');
@@ -1355,7 +1351,6 @@ function addButtonsToUserCells() {
       }
     }
 
-    // Fallback attempts
     if (!username) {
       const text = cell.innerText;
       const match = text.match(/@([a-zA-Z0-9_]+)/);
@@ -1364,12 +1359,11 @@ function addButtonsToUserCells() {
 
     if (!username) return;
 
-    // Create button
     const button = createTimelineListButton(username);
     button.style.fontSize = '14px';
-    button.style.background = 'transparent'; // Ensure transparent background
+    button.style.background = 'transparent';
     button.style.border = 'none';
-    button.style.padding = '2px'; // Reduced padding
+    button.style.padding = '0 4px';
     button.style.cursor = 'pointer';
     button.style.lineHeight = '1';
 
@@ -1378,54 +1372,90 @@ function addButtonsToUserCells() {
     container.style.display = 'inline-flex';
     container.style.alignItems = 'center';
     container.style.zIndex = '999';
-    container.style.flexShrink = '0'; // Prevent shrinking/growing
+    container.style.flexShrink = '0';
     container.appendChild(button);
 
-    // Strategy 1: PREFERRED - Append to User Name / Handle area.
-    // This is safer because it puts the button next to the name, avoiding the flex-spacer issue between name and follow button.
+    // STRATEGY: Target the name text specifically
+
+    // 1. Try to find the User-Name container
     const userNameElement = cell.querySelector('div[data-testid="User-Name"]');
     if (userNameElement) {
-      // Reduced margin significantly
-      container.style.marginLeft = '4px';
-
-      // Try appending to the first child (horizontal row usually containing name and verified badge)
-      const row = userNameElement.querySelector('div:first-child');
-
-      // Check if the row is actually a flex row (it usually is)
-      if (row && window.getComputedStyle(row).display.includes('flex')) {
-        row.appendChild(container);
+      const nameRow = userNameElement.querySelector('div:first-child');
+      if (nameRow) {
+        container.style.marginLeft = '4px';
+        nameRow.appendChild(container);
         return;
       }
-
-      // Fallback: append to the User-Name container itself
-      // Ensure it's displayed inline or flex to sit next to it
-      userNameElement.style.display = 'flex'; // Force flex if not present
+      // Fallback
+      userNameElement.style.display = 'flex';
+      userNameElement.style.flexDirection = 'row';
       userNameElement.style.alignItems = 'center';
+      container.style.marginLeft = '4px';
       userNameElement.appendChild(container);
       return;
     }
 
-    // Strategy 2: Insert before the "Follow"/"Following" button
-    // ONLY if we couldn't find the name area.
-    const buttons = cell.querySelectorAll('button[role="button"]');
-    let actionButton = null;
-    buttons.forEach(btn => {
-      if (btn !== cell) actionButton = btn;
-    });
-
-    if (actionButton) {
-      const btnContainer = actionButton.parentElement;
-      if (btnContainer) {
-        container.style.marginRight = '4px'; // Reduced margin
-        btnContainer.parentElement.insertBefore(container, btnContainer);
-        return;
+    // 2. Fallback: Find the link that contains the USERNAME text (not the image/avatar)
+    // This avoids injecting into the avatar link which hides overflow
+    let targetLink = null;
+    for (const link of userLinks) {
+      // specific check: does this link have text content that isn't empty?
+      // Avatar links usually have an image or empty textual content (aria-label separate)
+      if (link.innerText && link.innerText.trim().length > 0) {
+        // Does it match the username or display name?
+        // Usually the display name link is the one we want.
+        // We can check if it contains a span or div with text.
+        targetLink = link;
+        break;
       }
     }
 
-    // Strategy 3: Last resort append
+    if (targetLink && targetLink.parentElement) {
+      const parent = targetLink.parentElement;
+      // Ensure parent flows horizontally
+      container.style.marginLeft = '4px';
+
+      // We prefer appending to the parent of the link (the wrapper)
+      // But if the link itself is the flex container for text + badge, append to link? 
+      // Most likely append to parent.
+      // Make sure parent is flex row
+      parent.style.display = 'flex';
+      parent.style.flexDirection = 'row';
+      parent.style.alignItems = 'center';
+      parent.appendChild(container);
+      return;
+    }
+
+    // 3. Last fallback: Find the node containing the handle text (@username) and append to its parent
+    // This is risky but often works for obfuscated DOMs
+    const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    while (node = walker.nextNode()) {
+      if (node.textContent.includes('@' + username) || node.textContent.includes(username)) {
+        if (node.parentElement) {
+          // Often the handle is in a span, inside a div, inside a link...
+          // We want to go up until we find a block container or the cell itself
+          // For now, let's try appending to the parent of the text node's parent (the line wrapper)
+          const rigidParent = node.parentElement.parentElement;
+          if (rigidParent && rigidParent !== cell) {
+            container.style.marginLeft = '4px';
+            rigidParent.style.display = 'flex';
+            rigidParent.style.alignItems = 'center';
+            rigidParent.appendChild(container);
+            return;
+          }
+        }
+      }
+    }
+
+    // Last resort
     if (cell.children.length > 0) {
-      const lastChild = cell.children[cell.children.length - 1];
-      lastChild.appendChild(container);
+      // Try appending to the second child (usually the text content column)
+      if (cell.children.length >= 2) {
+        cell.children[1].appendChild(container);
+      } else {
+        cell.children[cell.children.length - 1].appendChild(container);
+      }
     } else {
       cell.appendChild(container);
     }
