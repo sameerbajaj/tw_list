@@ -374,12 +374,23 @@ async function fetchLists() {
       return [];
     }
 
-    // Extract user ID from cookie if not already set
+    const viewer = data?.data?.viewer;
+
+    // Set logged-in user ID from GraphQL response when available
+    // (cookie-based extraction can fail when cookies are HttpOnly)
+    if (!myUserId) {
+      const viewerUserId = viewer?.user_results?.result?.rest_id || viewer?.id_str || viewer?.id;
+      if (viewerUserId) {
+        myUserId = String(viewerUserId);
+        log('✅ DEBUG: Extracted myUserId from Lists API response:', myUserId);
+      }
+    }
+
+    // Fallback to cookie extraction
     if (!myUserId) {
       extractMyUserId();
     }
 
-    const viewer = data?.data?.viewer;
     const instructions = viewer?.list_management_timeline?.timeline?.instructions || [];
 
     // Find the TimelineAddEntries instruction
@@ -465,6 +476,11 @@ async function getUserListMemberships(userId, skipCheck = false) {
   if (!myUserId) {
     // Try to extract it now
     extractMyUserId();
+  }
+
+  // If still missing, fetch lists once to derive it from viewer response
+  if (!myUserId) {
+    await fetchLists();
   }
 
   if (!myUserId) {
@@ -1040,7 +1056,8 @@ async function showListDropdown(lists, userId, button, username = '') {
     }
   }
 
-  const initialMemberships = new Set(currentMemberships || []);
+  const normalizedMemberships = (currentMemberships || []).map(id => String(id));
+  const initialMemberships = new Set(normalizedMemberships);
 
   // Update header
   if (username) {
@@ -1062,7 +1079,7 @@ async function showListDropdown(lists, userId, button, username = '') {
     return bTime - aTime;
   });
 
-  const selectedLists = new Set(currentMemberships);
+  const selectedLists = new Set(normalizedMemberships);
 
   log('🔍 DEBUG: selectedLists Set:', selectedLists);
   log('🔍 DEBUG: currentMemberships array:', currentMemberships);
@@ -1076,7 +1093,8 @@ async function showListDropdown(lists, userId, button, username = '') {
     checkbox.className = 'quick-list-checkbox';
     checkbox.id = `list-checkbox-${list.id}`;
 
-    const isSelected = selectedLists.has(list.id);
+    const normalizedListId = String(list.id);
+    const isSelected = selectedLists.has(normalizedListId);
     log('🔍 DEBUG: List', list.name, '| list.id:', list.id, '| type:', typeof list.id, '| isSelected:', isSelected);
 
     checkbox.checked = isSelected;
@@ -1089,9 +1107,9 @@ async function showListDropdown(lists, userId, button, username = '') {
     checkbox.addEventListener('change', (e) => {
       e.stopPropagation();
       if (checkbox.checked) {
-        selectedLists.add(list.id);
+        selectedLists.add(normalizedListId);
       } else {
-        selectedLists.delete(list.id);
+        selectedLists.delete(normalizedListId);
       }
     });
 
