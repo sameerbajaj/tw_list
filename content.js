@@ -561,21 +561,40 @@ async function getUserListMemberships(userId, skipCheck = false) {
         for (const entry of entries) {
           log('🔍 DEBUG: Entry:', entry.entryId, '| Content type:', entry.content?.entryType);
 
-          // Extract list from entry
-          const list = entry.content?.itemContent?.list;
-          if (list?.id_str) {
-            // Check the is_member field!
-            const isMember = list.is_member;
-            log('🔍 DEBUG: List:', list.name, '(ID:', list.id_str + ') | is_member:', isMember);
+          // Collect all list objects from this entry
+          // Handle both module format (items array) and direct format
+          const listsInEntry = [];
 
-            if (isMember === true) {
-              memberLists.push(list.id_str);
-              log('✅ DEBUG: User IS on list:', list.name);
-            } else {
-              log('⚪ DEBUG: User is NOT on list:', list.name);
+          // Module format: entry.content.items[].item.itemContent.list
+          if (entry.content?.items) {
+            for (const item of entry.content.items) {
+              const list = item.item?.itemContent?.list;
+              if (list) listsInEntry.push(list);
             }
-          } else {
+          }
+
+          // Direct format: entry.content.itemContent.list
+          if (entry.content?.itemContent?.list) {
+            listsInEntry.push(entry.content.itemContent.list);
+          }
+
+          if (listsInEntry.length === 0) {
             log('🔍 DEBUG: No list found in this entry');
+          }
+
+          for (const list of listsInEntry) {
+            if (list.id_str) {
+              // Check the is_member field!
+              const isMember = list.is_member;
+              log('🔍 DEBUG: List:', list.name, '(ID:', list.id_str + ') | is_member:', isMember);
+
+              if (isMember === true) {
+                memberLists.push(list.id_str);
+                log('✅ DEBUG: User IS on list:', list.name);
+              } else {
+                log('⚪ DEBUG: User is NOT on list:', list.name);
+              }
+            }
           }
         }
       }
