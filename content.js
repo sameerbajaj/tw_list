@@ -456,15 +456,11 @@ async function getUserListMemberships(userId, skipCheck = false) {
     return [];
   }
 
-  // CACHE TEMPORARILY DISABLED FOR DEBUGGING
   // Check cache first
-  // const cached = getCache(CACHE_KEYS.MEMBERSHIPS) || {};
-  // log('🔍 DEBUG: Cache contents:', cached);
-  // if (cached[userId]) {
-  //   log('✅ DEBUG: Using cached memberships for user:', userId, '| Cached lists:', cached[userId]);
-  //   return cached[userId];
-  // }
-  log('🔍 DEBUG: Cache disabled - fetching fresh data for userId:', userId);
+  const cached = getCache(CACHE_KEYS.MEMBERSHIPS) || {};
+  if (cached[userId]) {
+    return cached[userId];
+  }
 
   // Check rate limit
   if (!checkRateLimit()) {
@@ -488,8 +484,6 @@ async function getUserListMemberships(userId, skipCheck = false) {
     return [];
   }
 
-  log('🔍 DEBUG: Fetching list memberships for userId:', userId, 'using ListOwnerships API');
-  log('🔍 DEBUG: My user ID:', myUserId);
   trackLookup();
 
   const csrfToken = getCsrfToken();
@@ -553,80 +547,115 @@ async function getUserListMemberships(userId, skipCheck = false) {
       return response.json();
     });
 
-    log('🔍 DEBUG: ListOwnerships API Response:', result);
-
-    // Check for errors
+    // GraphQL can return partial data with non-fatal errors.
+    // Only bail out if data is missing.
     if (result.errors) {
-      log('❌ DEBUG: API returned errors:', result.errors);
+      log('ListOwnerships returned partial errors; continuing with data');
+    }
+    if (!result?.data?.user?.result?.timeline?.timeline) {
+      log('Missing timeline data in ListOwnerships response');
       return [];
     }
 
     // Parse the response to extract list IDs
-    const memberLists = [];
+    const memberListSet = new Set();
     const instructions = result?.data?.user?.result?.timeline?.timeline?.instructions || [];
 
-    log('🔍 DEBUG: Found', instructions.length, 'instructions');
-
     for (const instruction of instructions) {
-      log('🔍 DEBUG: Processing instruction type:', instruction.type);
+      const entries = instruction?.entries || [];
+      if (entries.length === 0) {
+        continue;
+      }
 
-      if (instruction.type === 'TimelineAddEntries') {
-        const entries = instruction.entries || [];
-        log('🔍 DEBUG: Found', entries.length, 'entries in TimelineAddEntries');
+      for (const entry of entries) {
+        // Collect all list objects from this entry
+        // Handle module format, direct format, and nested content variants
+        const listsInEntry = [];
 
-        for (const entry of entries) {
-          log('🔍 DEBUG: Entry:', entry.entryId, '| Content type:', entry.content?.entryType);
-
-          // Collect all list objects from this entry
-          // Handle both module format (items array) and direct format
-          const listsInEntry = [];
-
-          // Module format: entry.content.items[].item.itemContent.list
-          if (entry.content?.items) {
-            for (const item of entry.content.items) {
-              const list = item.item?.itemContent?.list;
-              if (list) listsInEntry.push(list);
-            }
+        // Module format: entry.content.items[].item.itemContent.list
+        if (entry.content?.items) {
+          for (const item of entry.content.items) {
+            const list = item.item?.itemContent?.list;
+            if (list) listsInEntry.push(list);
           }
+        }
 
-          // Direct format: entry.content.itemContent.list
-          if (entry.content?.itemContent?.list) {
-            listsInEntry.push(entry.content.itemContent.list);
-          }
+        // Direct format: entry.content.itemContent.list
+        if (entry.content?.itemContent?.list) {
+          listsInEntry.push(entry.content.itemContent.list);
+        }
 
-          if (listsInEntry.length === 0) {
-            log('🔍 DEBUG: No list found in this entry');
-          }
+        // Nested variant: entry.content.content.itemContent.list
+        if (entry.content?.content?.itemContent?.list) {
+          listsInEntry.push(entry.content.content.itemContent.list);
+        }
 
-          for (const list of listsInEntry) {
-            if (list.id_str) {
-              // Check the is_member field!
-              const isMember = list.is_member;
-              log('🔍 DEBUG: List:', list.name, '(ID:', list.id_str + ') | is_member:', isMember);
+        for (const list of listsInEntry) {
+          if (list.id_str) {
+            // Check the is_member field
+            const isMember = list.is_member;
 
-              if (isMember === true) {
-                memberLists.push(list.id_str);
-                log('✅ DEBUG: User IS on list:', list.name);
-              } else {
-                log('⚪ DEBUG: User is NOT on list:', list.name);
-              }
+            if (isMember === true || isMember === 'true' || isMember === 1) {
+              memberListSet.add(String(list.id_str));
             }
           }
         }
       }
     }
 
-    log('🔍 DEBUG: Extracted list IDs where is_member=true:', memberLists);
+    let memberLists = [...memberListSet];
 
-    // CACHE TEMPORARILY DISABLED FOR DEBUGGING
+    // Fallback parser: X occasionally changes timeline nesting/entry formats.
+    // If strict parser finds nothing, deep-scan all nested objects for list-like
+    // objects that contain both id_str and is_member.
+    if (memberLists.length === 0) {
+      const discoveredLists = [];
+      const seenObjects = new WeakSet();
+
+      const scanForLists = (node) => {
+        if (!node || typeof node !== 'object') return;
+
+        if (seenObjects.has(node)) return;
+        seenObjects.add(node);
+
+        if (Array.isArray(node)) {
+          for (const item of node) scanForLists(item);
+          return;
+        }
+
+        if (typeof node.id_str === 'string' && Object.prototype.hasOwnProperty.call(node, 'is_member')) {
+          discoveredLists.push({
+            id: node.id_str,
+            name: node.name,
+            isMember: node.is_member
+          });
+        }
+
+        for (const value of Object.values(node)) {
+          scanForLists(value);
+        }
+      };
+
+      scanForLists(result);
+
+      const fallbackMemberLists = [...new Set(
+        discoveredLists
+          .filter(item => item.isMember === true || item.isMember === 'true' || item.isMember === 1)
+          .map(item => item.id)
+      )];
+
+      if (fallbackMemberLists.length > 0) {
+        return fallbackMemberLists;
+      }
+    }
+
     // Cache the results
-    // cached[userId] = memberLists;
-    // setCache(CACHE_KEYS.MEMBERSHIPS, cached);
+    cached[userId] = memberLists;
+    setCache(CACHE_KEYS.MEMBERSHIPS, cached);
 
-    log('🔍 DEBUG: Final result - User is on', memberLists.length, 'lists:', memberLists);
     return memberLists;
   } catch (error) {
-    log('❌ DEBUG: Error fetching list memberships:', error);
+    log('Error fetching list memberships:', error);
     return [];
   }
 }
@@ -1006,8 +1035,6 @@ function addButtonsToTweetDeckTweets() {
 
 // Show dropdown with lists
 async function showListDropdown(lists, userId, button, username = '') {
-  log('🔍 DEBUG: showListDropdown called with userId:', userId, 'username:', username);
-
   const existingDropdown = document.getElementById('quick-list-dropdown');
   if (existingDropdown) existingDropdown.remove();
 
@@ -1043,7 +1070,6 @@ async function showListDropdown(lists, userId, button, username = '') {
   // Determine if we should skip membership check
   // Skip if: setting enabled OR rate limit hit
   const shouldSkipCheck = currentSettings.skipMembershipCheck || !checkRateLimit();
-  log('🔍 DEBUG: shouldSkipCheck:', shouldSkipCheck, '(setting:', currentSettings.skipMembershipCheck, ', rate limit ok:', checkRateLimit() + ')');
 
   // Fetch current memberships
   const currentMemberships = await getUserListMemberships(userId, shouldSkipCheck);
@@ -1081,9 +1107,6 @@ async function showListDropdown(lists, userId, button, username = '') {
 
   const selectedLists = new Set(normalizedMemberships);
 
-  log('🔍 DEBUG: selectedLists Set:', selectedLists);
-  log('🔍 DEBUG: currentMemberships array:', currentMemberships);
-
   sortedLists.forEach(list => {
     const item = document.createElement('div');
     item.className = 'quick-list-item';
@@ -1095,8 +1118,6 @@ async function showListDropdown(lists, userId, button, username = '') {
 
     const normalizedListId = String(list.id);
     const isSelected = selectedLists.has(normalizedListId);
-    log('🔍 DEBUG: List', list.name, '| list.id:', list.id, '| type:', typeof list.id, '| isSelected:', isSelected);
-
     checkbox.checked = isSelected;
 
     const label = document.createElement('label');
