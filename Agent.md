@@ -64,6 +64,30 @@ This was the hardest problem.
 -   **Rate Limiting**: Twitter has aggressive rate limits. A request queue with random delays (e.g., 500ms - 1500ms) is mandatory.
 -   **Store State**: Use `localStorage` to cache list memberships to avoid re-fetching on every page load/scroll (MutationObserver triggers frequently).
 
+## 9. List Membership Reliability (Critical)
+
+### Partial GraphQL Success Is Common
+-   For `ListOwnerships`, X can return **both** `data` and `errors` in the same payload.
+-   Do **not** treat `result.errors` as fatal by default.
+-   Only bail out when timeline data is missing (e.g., `!result?.data?.user?.result?.timeline?.timeline`).
+
+### Parse Strategy Must Be Shape-Resilient
+-   Do not assume only `TimelineAddEntries` contains list entries.
+-   Iterate any instruction with an `entries` array.
+-   Extract list objects from multiple shapes:
+    -   `entry.content.items[].item.itemContent.list`
+    -   `entry.content.itemContent.list`
+    -   `entry.content.content.itemContent.list`
+
+### Membership Matching Rules
+-   Normalize all list IDs to strings before set membership checks.
+-   Treat `is_member` as true for values: `true`, `'true'`, and `1`.
+-   Keep a fallback deep scan for `id_str` + `is_member` objects if strict extraction yields no memberships.
+
+### UI Symptom to Recognize Quickly
+-   If dropdown title shows `Add @<user> to:` and all checkboxes are unchecked for known members,
+    check for a premature return on GraphQL `errors` and parser shape mismatch first.
+
 ## Important Files
 -   `content.js`: Main logic.
 -   `manifest.json`: Permissions and matching patterns.
