@@ -4,8 +4,13 @@
   "version": "1.0",
   "description": "Quickly add users to Twitter lists while browsing",
   "permissions": [
-    "cookies"
+    "cookies",
+    "contextMenus",
+    "notifications"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "host_permissions": [
     "https://x.com/*",
     "https://twitter.com/*",

@@ -9,6 +9,7 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 - ✓ **View current lists** - See which lists users are already on
 - ➕➖ **Add & Remove** - Manage list membership with checkboxes
 - 🆕 **Create private lists inline** - Spin up a new private list from the popup or quick-add dropdown
+- 🖱️ **Right-click add to list** - Add a mentioned username to one of your private lists from the browser context menu
 - 📝 **List Manager** - View and edit all members of your private lists in one place
 - ⚡ **Smart caching** - 24-hour localStorage cache for instant lookups
 - 🛡️ **Rate limiting** - Built-in protection to keep your account safe
@@ -49,6 +50,13 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 4. Use the `Create Private List` action in the dropdown if you need a new list first
 5. Check/uncheck boxes to add/remove from lists
 6. Click "Save Changes"
+
+### From The Right-Click Menu
+1. Right-click a username mention or profile link on X/Twitter
+2. Open the `Add to X List` submenu
+3. Pick one of your private lists
+4. The extension will add that user and show a browser notification with the result
+5. If your lists are stale, use `Refresh private lists` in the same submenu
 
 ### Using the List Manager (NEW!)
 1. Click the extension icon in your browser toolbar
