@@ -13,9 +13,22 @@ const LIST_MEMBERS_QUERY_ID = '8ybCIfKAYYex7FdmJ0PzwQ';
 const LIST_OWNERSHIPS_QUERY_ID = 'J25SWJdbyp3MRho1c9NhqQ';
 const LISTS_QUERY_ID = 'xzVN0C62pNPWVfUjixdzeQ';
 const USER_BY_SCREEN_NAME_QUERY_ID = '-oaLodhGbbnzJBACb1kk2Q';
+const CREATE_LIST_QUERY_ID = 'QXil-VE8uEJPfUKFiO36Bg';
 const BEARER_TOKEN = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 const DEBUG = true;
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CREATE_LIST_FEATURES = {
+  profile_label_improvements_pcf_label_in_post_enabled: true,
+  responsive_web_profile_redirect_enabled: false,
+  rweb_tipjar_consumption_enabled: true,
+  verified_phone_label_enabled: true,
+  responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+  responsive_web_graphql_timeline_navigation_enabled: true
+};
+const CREATE_LIST_FIELD_TOGGLES = {
+  withPayments: false,
+  withAuxiliaryUserLabels: true
+};
 
 // Load settings from localStorage
 function getSettings() {
@@ -774,6 +787,68 @@ async function removeUserFromList(listId, userId) {
   }
 }
 
+async function createPrivateList(name, description = '') {
+  const csrfToken = getCsrfToken();
+  if (!csrfToken) {
+    alert('Authentication error. Please refresh the page.');
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${GRAPHQL_ENDPOINT}/${CREATE_LIST_QUERY_ID}/CreateList`, {
+      method: 'POST',
+      headers: {
+        'authorization': BEARER_TOKEN,
+        'x-csrf-token': csrfToken,
+        'content-type': 'application/json',
+        'x-twitter-client-language': 'en'
+      },
+      body: JSON.stringify({
+        variables: {
+          name,
+          description,
+          isPrivate: true
+        },
+        features: CREATE_LIST_FEATURES,
+        fieldToggles: CREATE_LIST_FIELD_TOGGLES,
+        queryId: CREATE_LIST_QUERY_ID
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      log('Create list API ERROR - Status:', response.status, 'Data:', data);
+      return null;
+    }
+
+    const createdList = data?.data?.list;
+    if (!createdList?.id_str || !createdList?.name) {
+      log('Create list API returned unexpected payload:', data);
+      return null;
+    }
+
+    const newList = {
+      id: createdList.id_str,
+      name: createdList.name
+    };
+
+    if (!Array.isArray(cachedLists)) {
+      cachedLists = [];
+    }
+
+    if (!cachedLists.some(list => String(list.id) === String(newList.id))) {
+      cachedLists.unshift(newList);
+    }
+
+    updateListActivity(newList.id);
+    return newList;
+  } catch (error) {
+    log('ERROR creating private list:', error);
+    return null;
+  }
+}
+
 // Create a small list button for timeline tweets
 function createTimelineListButton(username) {
   const button = document.createElement('button');
@@ -809,14 +884,6 @@ function createTimelineListButton(username) {
     }
 
     const lists = await fetchLists();
-
-    if (lists.length === 0) {
-      alert('No lists found. Create a list first on Twitter.');
-      const iconUrl = chrome.runtime.getURL('icon48.png');
-      button.innerHTML = `<img src="${iconUrl}" style="width: 1.25em; height: 1.25em; vertical-align: text-bottom; display: block;" alt="Add to list">`;
-      button.disabled = false;
-      return;
-    }
 
     showListDropdown(lists, userId, button, username);
   });
@@ -860,14 +927,6 @@ function createTweetDeckListButton(username, userId = null) {
     }
 
     const lists = await fetchLists();
-
-    if (lists.length === 0) {
-      alert('No lists found. Create a list first on Twitter.');
-      const iconUrl = chrome.runtime.getURL('icon48.png');
-      button.innerHTML = `<img src="${iconUrl}" style="width: 1.25em; height: 1.25em; vertical-align: text-bottom; display: block;" alt="Add to list">`;
-      button.disabled = false;
-      return;
-    }
 
     showListDropdown(lists, finalUserId, button, username);
   });
@@ -1107,7 +1166,15 @@ async function showListDropdown(lists, userId, button, username = '') {
 
   const selectedLists = new Set(normalizedMemberships);
 
-  sortedLists.forEach(list => {
+  const listItemsContainer = document.createElement('div');
+  dropdown.appendChild(listItemsContainer);
+
+  const emptyState = document.createElement('div');
+  emptyState.className = 'quick-list-empty';
+  emptyState.textContent = 'No private lists yet. Create one below.';
+  dropdown.appendChild(emptyState);
+
+  const createListItem = (list) => {
     const item = document.createElement('div');
     item.className = 'quick-list-item';
 
@@ -1142,8 +1209,64 @@ async function showListDropdown(lists, userId, button, username = '') {
       checkbox.dispatchEvent(new Event('change'));
     });
 
-    dropdown.appendChild(item);
+    return item;
+  };
+
+  const syncEmptyState = () => {
+    emptyState.style.display = listItemsContainer.children.length === 0 ? 'block' : 'none';
+  };
+
+  sortedLists.forEach(list => {
+    listItemsContainer.appendChild(createListItem(list));
   });
+  syncEmptyState();
+
+  const createButton = document.createElement('button');
+  createButton.className = 'quick-list-create';
+  createButton.textContent = 'Create Private List';
+  createButton.addEventListener('click', async (e) => {
+    e.stopPropagation();
+
+    const nameInput = window.prompt('Name your new private list:');
+    if (nameInput === null) {
+      return;
+    }
+
+    const name = nameInput.trim();
+    if (!name) {
+      alert('List name cannot be empty.');
+      return;
+    }
+
+    const descriptionInput = window.prompt(`Optional description for "${name}":`, '');
+    if (descriptionInput === null) {
+      return;
+    }
+
+    createButton.disabled = true;
+    createButton.textContent = 'Creating...';
+
+    const newList = await createPrivateList(name, descriptionInput.trim());
+    if (!newList) {
+      createButton.disabled = false;
+      createButton.textContent = 'Create Private List';
+      alert('Could not create the private list. Please try again.');
+      return;
+    }
+
+    const newListId = String(newList.id);
+    if (!lists.some(list => String(list.id) === newListId)) {
+      lists.unshift(newList);
+    }
+
+    selectedLists.add(newListId);
+    listItemsContainer.prepend(createListItem(newList));
+    syncEmptyState();
+
+    createButton.disabled = false;
+    createButton.textContent = 'Create Private List';
+  });
+  dropdown.appendChild(createButton);
 
   // Add submit button
   const submitButton = document.createElement('button');

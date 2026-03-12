@@ -8,6 +8,7 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 - 👤 **Profile buttons** - Add from profile pages
 - ✓ **View current lists** - See which lists users are already on
 - ➕➖ **Add & Remove** - Manage list membership with checkboxes
+- 🆕 **Create private lists inline** - Spin up a new private list from the popup or quick-add dropdown
 - 📝 **List Manager** - View and edit all members of your private lists in one place
 - ⚡ **Smart caching** - 24-hour localStorage cache for instant lookups
 - 🛡️ **Rate limiting** - Built-in protection to keep your account safe
@@ -37,28 +38,31 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 1. Browse your Twitter/X home feed
 2. You'll see a 📋 button next to each username in tweets
 3. Click it - extension checks which lists they're on (cached after first check)
-4. Select/deselect lists with checkboxes
-5. Click "Save Changes" to apply
+4. If you need a new private list, use the `Create Private List` action inside the dropdown
+5. Select/deselect lists with checkboxes
+6. Click "Save Changes" to apply
 
 ### From Profile Page
 1. Go to any Twitter/X profile (e.g., `https://x.com/elonmusk`)
 2. You'll see a blue "+ List" button near the Follow button
 3. Click it to see your lists with current membership status
-4. Check/uncheck boxes to add/remove from lists
-5. Click "Save Changes"
+4. Use the `Create Private List` action in the dropdown if you need a new list first
+5. Check/uncheck boxes to add/remove from lists
+6. Click "Save Changes"
 
 ### Using the List Manager (NEW!)
 1. Click the extension icon in your browser toolbar
 2. Switch to the "📋 List Manager" tab
 3. Select a list from the dropdown
-4. Click "Fetch Members" to load all current members
-5. View all handles in the text area below
-6. **To add a member**: Type their handle on a new line (with or without @)
-7. **To remove a member**: Delete their line from the list
-8. Click "Save Changes" button when you're ready
-9. Review the confirmation dialog showing all pending changes
-10. Confirm to apply the changes to your list
-11. **To delete the entire list**: Click the 🗑️ button next to the dropdown and confirm
+4. Or choose `+ Create a new private list...` from the dropdown to make one without leaving the extension
+5. Click "Fetch Members" to load all current members
+6. View all handles in the text area below
+7. **To add a member**: Type their handle on a new line (with or without @)
+8. **To remove a member**: Delete their line from the list
+9. Click "Save Changes" button when you're ready
+10. Review the confirmation dialog showing all pending changes
+11. Confirm to apply the changes to your list
+12. **To delete the entire list**: Click the 🗑️ button next to the dropdown and confirm
 
 **Tip**: You can add/remove multiple members at once by editing the text area. The "Save Changes" button will show you how many additions (+) and removals (-) are pending!
 

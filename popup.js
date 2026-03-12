@@ -103,7 +103,21 @@ const ADD_MEMBER_QUERY_ID = 'EadD8ivrhZhYQr2pDmCpjA';
 const REMOVE_MEMBER_QUERY_ID = 'B5tMzrMYuFHJex_4EXFTSw';
 const USER_BY_SCREEN_NAME_QUERY_ID = '-oaLodhGbbnzJBACb1kk2Q';
 const DELETE_LIST_QUERY_ID = 'UnN9Th1BDbeLjpgjGSpL3Q';
+const CREATE_LIST_QUERY_ID = 'QXil-VE8uEJPfUKFiO36Bg';
 const BEARER_TOKEN = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
+const CREATE_LIST_OPTION_VALUE = '__create_private_list__';
+const CREATE_LIST_FEATURES = {
+  profile_label_improvements_pcf_label_in_post_enabled: true,
+  responsive_web_profile_redirect_enabled: false,
+  rweb_tipjar_consumption_enabled: true,
+  verified_phone_label_enabled: true,
+  responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+  responsive_web_graphql_timeline_navigation_enabled: true
+};
+const CREATE_LIST_FIELD_TOGGLES = {
+  withPayments: false,
+  withAuxiliaryUserLabels: true
+};
 
 let currentList = null;
 let currentMembers = new Set();
@@ -536,6 +550,76 @@ async function deleteList(listId) {
   }
 }
 
+async function createPrivateList(name, description = '') {
+  const csrfToken = await getCsrfToken();
+  if (!csrfToken) return null;
+
+  try {
+    const response = await fetch(`${GRAPHQL_ENDPOINT}/${CREATE_LIST_QUERY_ID}/CreateList`, {
+      method: 'POST',
+      headers: {
+        'authorization': BEARER_TOKEN,
+        'x-csrf-token': csrfToken,
+        'content-type': 'application/json',
+        'x-twitter-client-language': 'en'
+      },
+      body: JSON.stringify({
+        variables: {
+          name,
+          description,
+          isPrivate: true
+        },
+        features: CREATE_LIST_FEATURES,
+        fieldToggles: CREATE_LIST_FIELD_TOGGLES,
+        queryId: CREATE_LIST_QUERY_ID
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Create list API error - Status:', response.status, 'Response:', data);
+      return null;
+    }
+
+    const createdList = data?.data?.list;
+    if (!createdList?.id_str || !createdList?.name) {
+      console.error('Create list API returned unexpected payload:', data);
+      return null;
+    }
+
+    return {
+      id: createdList.id_str,
+      name: createdList.name
+    };
+  } catch (error) {
+    console.error('ERROR creating private list:', error);
+    return null;
+  }
+}
+
+function populateListSelect(listSelect, lists) {
+  const placeholder = lists.length === 0 ? 'No private lists yet' : '-- Select a list --';
+  listSelect.innerHTML = '';
+
+  const placeholderOption = document.createElement('option');
+  placeholderOption.value = '';
+  placeholderOption.textContent = placeholder;
+  listSelect.appendChild(placeholderOption);
+
+  const createOption = document.createElement('option');
+  createOption.value = CREATE_LIST_OPTION_VALUE;
+  createOption.textContent = '+ Create a new private list...';
+  listSelect.appendChild(createOption);
+
+  lists.forEach(list => {
+    const option = document.createElement('option');
+    option.value = list.id;
+    option.textContent = list.name;
+    listSelect.appendChild(option);
+  });
+}
+
 function showStatus(message, type = 'info') {
   const container = document.getElementById('status');
   const toast = document.createElement('div');
@@ -773,24 +857,72 @@ document.addEventListener('DOMContentLoaded', async () => {
   const fetchBtn = document.getElementById('fetch-btn');
   const textarea = document.getElementById('members-textarea');
 
-  const lists = await fetchLists();
+  let lists = await fetchLists();
+  populateListSelect(listSelect, lists);
 
   if (lists.length === 0) {
-    listSelect.innerHTML = '<option value="">No private lists found</option>';
-    showStatus('No private lists found. Create one on X.com first.', 'error');
-  } else {
-    listSelect.innerHTML = '<option value="">-- Select a list --</option>';
-    lists.forEach(list => {
-      const option = document.createElement('option');
-      option.value = list.id;
-      option.textContent = list.name;
-      listSelect.appendChild(option);
-    });
+    showStatus('No private lists found yet. Use the dropdown to create one.', 'info');
   }
 
   const deleteBtn = document.getElementById('delete-list-btn');
 
-  listSelect.addEventListener('change', () => {
+  listSelect.addEventListener('change', async () => {
+    if (listSelect.value === CREATE_LIST_OPTION_VALUE) {
+      const nameInput = window.prompt('Name your new private list:');
+      if (nameInput === null) {
+        listSelect.value = '';
+        fetchBtn.disabled = true;
+        deleteBtn.disabled = true;
+        return;
+      }
+
+      const name = nameInput.trim();
+      if (!name) {
+        showStatus('List name cannot be empty', 'error');
+        listSelect.value = '';
+        fetchBtn.disabled = true;
+        deleteBtn.disabled = true;
+        return;
+      }
+
+      const descriptionInput = window.prompt(`Optional description for "${name}":`, '');
+      if (descriptionInput === null) {
+        listSelect.value = '';
+        fetchBtn.disabled = true;
+        deleteBtn.disabled = true;
+        return;
+      }
+
+      listSelect.disabled = true;
+      const newList = await createPrivateList(name, descriptionInput.trim());
+      listSelect.disabled = false;
+
+      if (!newList) {
+        listSelect.value = '';
+        fetchBtn.disabled = true;
+        deleteBtn.disabled = true;
+        showStatus(`Could not create "${name}"`, 'error');
+        return;
+      }
+
+      if (!lists.some(list => String(list.id) === String(newList.id))) {
+        lists.unshift(newList);
+      }
+
+      populateListSelect(listSelect, lists);
+      listSelect.value = newList.id;
+      currentList = newList;
+      currentMembers = new Set();
+      textarea.value = '';
+      updateMemberCount();
+      updateSaveButton();
+
+      fetchBtn.disabled = false;
+      deleteBtn.disabled = false;
+      showStatus(`Created private list "${newList.name}". Add handles below or fetch members.`, 'success');
+      return;
+    }
+
     const hasSelection = !!listSelect.value;
     fetchBtn.disabled = !hasSelection;
     deleteBtn.disabled = !hasSelection;
@@ -844,10 +976,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentMembers.clear();
       updateMemberCount();
 
-      // Update dropdown message if no lists left
-      if (lists.length === 0) {
-        listSelect.innerHTML = '<option value="">No private lists found</option>';
-      }
+      populateListSelect(listSelect, lists);
     } else {
       showStatus(`❌ Failed to delete list "${selectedList.name}"`, 'error');
       deleteBtn.disabled = false;
