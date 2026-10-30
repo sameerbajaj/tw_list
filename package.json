@@ -1,0 +1,12 @@
+{
+  "name": "twitter-list-quick-add",
+  "version": "1.0.0",
+  "description": "Quickly add users to Twitter/X lists while browsing profiles and timeline.",
+  "homepage": "https://sameerbajaj.com/tools/twitter-lists/",
+  "author": "Sameer Bajaj (https://sameerbajaj.com)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sameerbajaj/tw_list.git"
+  }
+}

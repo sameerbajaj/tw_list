@@ -137,3 +137,7 @@ A simple Chrome extension to quickly add users to Twitter lists while browsing p
 ## Disclaimer
 
 This extension is for educational purposes. It uses Twitter's internal APIs which may change at any time. Use at your own risk. This is not affiliated with or endorsed by Twitter/X.
+
+---
+
+Part of the open-source tools collection by [Sameer Bajaj](https://sameerbajaj.com). Learn more on the [project page](https://sameerbajaj.com/tools/twitter-lists/).
